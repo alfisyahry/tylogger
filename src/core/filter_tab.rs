@@ -20,17 +20,44 @@ pub struct FilteredDocumentSource {
 
 impl FilteredDocumentSource {
     /// Creates an independent virtual filtered document from a parent source.
+    /// Batches line retrieval in short-lived lock windows to eliminate GUI thread contention.
     pub fn create(
         parent_source: Arc<Mutex<Box<dyn LogSource>>>,
         criteria: FilterCriteria,
     ) -> Result<Self, String> {
-        let mut parent_lock = parent_source.lock().map_err(|e| e.to_string())?;
-        let total_parent_lines = parent_lock.line_count();
-        let parent_title = parent_lock.display_name().to_string();
+        let (total_parent_lines, parent_title) = {
+            let parent_lock = parent_source.lock().map_err(|e| e.to_string())?;
+            (
+                parent_lock.line_count(),
+                parent_lock.display_name().to_string(),
+            )
+        };
+
+        const CHUNK_SIZE: usize = 1024;
+        let mut chunk_start = 0;
+        let mut chunk_buf: Vec<Option<String>> = Vec::new();
+        let parent_clone = Arc::clone(&parent_source);
 
         let filtered_indices = FilterEngine::apply_filter(
             total_parent_lines,
-            |idx| parent_lock.get_line(idx).ok(),
+            |idx| {
+                if chunk_buf.is_empty()
+                    || idx < chunk_start
+                    || idx >= chunk_start + chunk_buf.len()
+                {
+                    chunk_start = idx;
+                    let count = (total_parent_lines - idx).min(CHUNK_SIZE);
+                    chunk_buf.clear();
+                    if let Ok(mut parent_lock) = parent_clone.lock() {
+                        for i in 0..count {
+                            chunk_buf.push(parent_lock.get_line(idx + i).ok());
+                        }
+                    } else {
+                        return None;
+                    }
+                }
+                chunk_buf.get(idx - chunk_start).cloned().flatten()
+            },
             &criteria,
             None,
         );
@@ -49,20 +76,39 @@ impl FilteredDocumentSource {
     }
 
     /// Appends newly matched lines when parent source live tail receives appends.
-    pub fn update_with_parent_appends(&mut self, start_parent_idx: usize, new_parent_lines: usize) {
-        if let Ok(mut parent_lock) = self.parent_source.lock() {
-            for idx in start_parent_idx..(start_parent_idx + new_parent_lines) {
-                if let Ok(line) = parent_lock.get_line(idx) {
+    /// Employs chunked reads to avoid long mutex lock retention.
+    pub fn update_with_parent_appends(
+        &mut self,
+        start_parent_idx: usize,
+        new_parent_lines: usize,
+    ) {
+        const CHUNK_SIZE: usize = 1024;
+        let end_parent_idx = start_parent_idx + new_parent_lines;
+        let mut curr_idx = start_parent_idx;
+
+        while curr_idx < end_parent_idx {
+            let chunk_end = (curr_idx + CHUNK_SIZE).min(end_parent_idx);
+            let mut batch = Vec::with_capacity(chunk_end - curr_idx);
+            if let Ok(mut parent_lock) = self.parent_source.lock() {
+                for idx in curr_idx..chunk_end {
+                    batch.push(parent_lock.get_line(idx).ok());
+                }
+            } // Lock released immediately
+
+            for (offset, line_opt) in batch.into_iter().enumerate() {
+                let actual_idx = curr_idx + offset;
+                if let Some(line) = line_opt {
                     let matches = crate::core::search::SearchEngine::matches_line(
                         &line,
                         &self.criteria.pattern,
                         &self.criteria.options,
                     );
                     if matches {
-                        self.filtered_indices.push(idx);
+                        self.filtered_indices.push(actual_idx);
                     }
                 }
             }
+            curr_idx = chunk_end;
         }
     }
 }
@@ -139,10 +185,36 @@ impl LogSource for FilteredDocumentSource {
             }
             UpdateEvent::Truncated => {
                 self.generation += 1;
-                let new_total = parent.line_count();
+                let new_total = {
+                    let parent_lock = self.parent_source.lock().map_err(|e| e.to_string())?;
+                    parent_lock.line_count()
+                };
+
+                const CHUNK_SIZE: usize = 1024;
+                let mut chunk_start = 0;
+                let mut chunk_buf: Vec<Option<String>> = Vec::new();
+                let parent_clone = Arc::clone(&self.parent_source);
+
                 self.filtered_indices = FilterEngine::apply_filter(
                     new_total,
-                    |idx| parent.get_line(idx).ok(),
+                    |idx| {
+                        if chunk_buf.is_empty()
+                            || idx < chunk_start
+                            || idx >= chunk_start + chunk_buf.len()
+                        {
+                            chunk_start = idx;
+                            let count = (new_total - idx).min(CHUNK_SIZE);
+                            chunk_buf.clear();
+                            if let Ok(mut parent_lock) = parent_clone.lock() {
+                                for i in 0..count {
+                                    chunk_buf.push(parent_lock.get_line(idx + i).ok());
+                                }
+                            } else {
+                                return None;
+                            }
+                        }
+                        chunk_buf.get(idx - chunk_start).cloned().flatten()
+                    },
                     &self.criteria,
                     None,
                 );
@@ -212,5 +284,31 @@ mod tests {
         // Independent bookmarks
         assert!(filter_tab.toggle_bookmark(0));
         assert!(filter_tab.is_bookmarked(0));
+    }
+
+    #[test]
+    fn test_concurrent_parent_access_during_filtering() {
+        let lines: Vec<String> = (0..5000)
+            .map(|i| {
+                if i % 10 == 0 {
+                    format!("Line {} [CRITICAL] Alert", i)
+                } else {
+                    format!("Line {} [INFO] Normal", i)
+                }
+            })
+            .collect();
+        let str_lines: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
+        let parent: Box<dyn LogSource> = Box::new(MockSource::new("big.log", &str_lines));
+        let parent_arc = Arc::new(Mutex::new(parent));
+
+        let crit = FilterCriteria::new_include("CRITICAL", false);
+        let filter_tab = FilteredDocumentSource::create(Arc::clone(&parent_arc), crit).unwrap();
+
+        assert_eq!(filter_tab.line_count(), 500);
+
+        // Verify parent lock is easily accessible immediately
+        let mut guard = parent_arc.lock().unwrap();
+        assert_eq!(guard.line_count(), 5000);
+        assert!(guard.get_line(0).unwrap().contains("[CRITICAL]"));
     }
 }
