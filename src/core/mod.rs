@@ -36,6 +36,8 @@ pub mod workspace;
 
 #[cfg(test)]
 mod leak_tests;
+#[cfg(test)]
+mod ingestion_test;
 
 pub use analytics::{
     AggregateField, AggregationResult, AggregationType, AnalyticsEngine, AnalyticsPreset,
