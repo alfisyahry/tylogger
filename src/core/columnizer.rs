@@ -294,6 +294,10 @@ impl Columnizer for CsvColumnizer {
     fn detect_confidence(&self, sample_lines: &[&str]) -> f32 {
         let mut hits = 0;
         for line in sample_lines {
+            let trimmed = line.trim();
+            if trimmed.starts_with('{') || trimmed.starts_with('<') {
+                continue;
+            }
             if line.contains(self.delimiter) {
                 let cols = self.parse_line(line);
                 if cols.len() >= 3 {
@@ -811,17 +815,29 @@ impl ColumnizerRegistry {
             return "plain";
         }
 
+        // Deterministic priority ordering so structured formats override generic delimiters
+        let priority_order = [
+            "jsonl",
+            "log4j_xml",
+            "apache_combined",
+            "nginx",
+            "clf",
+            "syslog",
+            "timestamp",
+            "tsv",
+            "csv",
+        ];
+
         let mut best_id = "plain";
         let mut best_score = 0.35f32; // Threshold for override
 
-        for col in self.columnizers.values() {
-            if col.id() == "plain" {
-                continue;
-            }
-            let score = col.detect_confidence(sample_lines);
-            if score > best_score {
-                best_score = score;
-                best_id = col.id();
+        for id in priority_order {
+            if let Some(col) = self.columnizers.get(id) {
+                let score = col.detect_confidence(sample_lines);
+                if score > best_score {
+                    best_score = score;
+                    best_id = col.id();
+                }
             }
         }
 
