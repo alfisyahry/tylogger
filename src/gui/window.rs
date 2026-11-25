@@ -154,6 +154,21 @@ impl AppState {
     }
 }
 
+impl Drop for AppState {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.font.is_null() {
+                DeleteObject(self.font);
+                self.font = null_mut();
+            }
+            if !self.ui_font.is_null() {
+                DeleteObject(self.ui_font);
+                self.ui_font = null_mut();
+            }
+        }
+    }
+}
+
 pub fn run_gui_app(mut state: AppState) -> Result<(), String> {
     unsafe {
         let instance = GetModuleHandleW(null_mut());
@@ -555,9 +570,11 @@ unsafe extern "system" fn wnd_proc(
                 let state = &mut *state_ptr;
                 if !state.font.is_null() {
                     DeleteObject(state.font);
+                    state.font = null_mut();
                 }
                 if !state.ui_font.is_null() {
                     DeleteObject(state.ui_font);
+                    state.ui_font = null_mut();
                 }
             }
             PostQuitMessage(0);
