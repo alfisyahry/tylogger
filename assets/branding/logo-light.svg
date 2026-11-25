@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect x="16" y="16" width="224" height="224" rx="36" fill="#F4F5F7" stroke="#315F9A" stroke-width="8"/>
+  <line x1="82" y1="46" x2="82" y2="210" stroke="#DFE3E9" stroke-width="6" stroke-linecap="round"/>
+  <!-- Row 1 -->
+  <line x1="40" y1="76" x2="68" y2="76" stroke="#929BA6" stroke-width="12" stroke-linecap="round"/>
+  <line x1="98" y1="76" x2="214" y2="76" stroke="#232932" stroke-width="12" stroke-linecap="round"/>
+  <!-- Row 2: Target row with accent -->
+  <line x1="40" y1="128" x2="68" y2="128" stroke="#81530A" stroke-width="12" stroke-linecap="round"/>
+  <line x1="98" y1="128" x2="152" y2="128" stroke="#81530A" stroke-width="12" stroke-linecap="round"/>
+  <line x1="164" y1="128" x2="204" y2="128" stroke="#232932" stroke-width="12" stroke-linecap="round"/>
+  <!-- Row 3 -->
+  <line x1="40" y1="180" x2="68" y2="180" stroke="#929BA6" stroke-width="12" stroke-linecap="round"/>
+  <line x1="98" y1="180" x2="184" y2="180" stroke="#505D6D" stroke-width="12" stroke-linecap="round"/>
+</svg>
