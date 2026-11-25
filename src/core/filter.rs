@@ -230,6 +230,140 @@ impl FilterEngine {
     }
 }
 
+/// Reusable named filter preset.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilterPreset {
+    pub name: String,
+    pub pattern: String,
+    pub mode: FilterMode,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub is_regex: bool,
+    pub search_mode: String,
+    pub range_start: Option<String>,
+    pub range_end: Option<String>,
+    pub back_spread: usize,
+    pub fore_spread: usize,
+    pub column_index: Option<usize>,
+    pub columnizer_id: Option<String>,
+}
+
+impl FilterPreset {
+    pub fn from_criteria(name: &str, crit: &FilterCriteria, col_id: Option<&str>) -> Self {
+        Self {
+            name: name.to_string(),
+            pattern: crit.pattern.clone(),
+            mode: crit.mode,
+            case_sensitive: crit.options.case_sensitive,
+            whole_word: crit.options.whole_word,
+            is_regex: crit.options.is_regex,
+            search_mode: format!("{:?}", crit.options.mode),
+            range_start: crit.range_start.clone(),
+            range_end: crit.range_end.clone(),
+            back_spread: crit.back_spread,
+            fore_spread: crit.fore_spread,
+            column_index: crit.column_index,
+            columnizer_id: col_id.map(|s| s.to_string()),
+        }
+    }
+
+    pub fn to_json(&self) -> String {
+        format!(
+            "{{\"name\":\"{}\",\"pattern\":\"{}\",\"mode\":\"{:?}\",\"case_sensitive\":{},\"whole_word\":{},\"is_regex\":{},\"back_spread\":{},\"fore_spread\":{}}}",
+            self.name,
+            self.pattern,
+            self.mode,
+            self.case_sensitive,
+            self.whole_word,
+            self.is_regex,
+            self.back_spread,
+            self.fore_spread
+        )
+    }
+}
+
+/// Persistent manager for filter presets and privacy-safe recent search history.
+#[derive(Debug, Clone)]
+pub struct FilterPresetManager {
+    pub presets: Vec<FilterPreset>,
+    pub recent_history: Vec<String>,
+    pub max_history: usize,
+}
+
+impl Default for FilterPresetManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FilterPresetManager {
+    pub fn new() -> Self {
+        Self {
+            presets: Vec::new(),
+            recent_history: Vec::new(),
+            max_history: 20,
+        }
+    }
+
+    pub fn add_preset(&mut self, preset: FilterPreset) {
+        if let Some(pos) = self.presets.iter().position(|p| p.name == preset.name) {
+            self.presets[pos] = preset;
+        } else {
+            self.presets.push(preset);
+        }
+    }
+
+    pub fn delete_preset(&mut self, name: &str) -> bool {
+        if let Some(pos) = self.presets.iter().position(|p| p.name == name) {
+            self.presets.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_preset(&self, name: &str) -> Option<&FilterPreset> {
+        self.presets.iter().find(|p| p.name == name)
+    }
+
+    pub fn record_history(&mut self, query: &str) {
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        self.recent_history.retain(|q| q != trimmed);
+        self.recent_history.insert(0, trimmed.to_string());
+        if self.recent_history.len() > self.max_history {
+            self.recent_history.truncate(self.max_history);
+        }
+    }
+
+    pub fn clear_history(&mut self) {
+        self.recent_history.clear();
+    }
+
+    pub fn to_json(&self) -> String {
+        let mut out = String::from("{\"presets\":[");
+        for (i, p) in self.presets.iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            out.push_str(&p.to_json());
+        }
+        out.push_str("],\"recent\":[");
+        for (i, q) in self.recent_history.iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            out.push('"');
+            out.push_str(q);
+            out.push('"');
+        }
+        out.push_str("]}");
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,5 +440,32 @@ mod tests {
         // Hit 12 -> 10..14
         // Union without duplicates -> 8..14
         assert_eq!(spread_matches, vec![8, 9, 10, 11, 12, 13, 14]);
+    }
+
+    #[test]
+    fn test_filter_preset_and_history_manager() {
+        let mut mgr = FilterPresetManager::new();
+        let crit = FilterCriteria::new_include("CRITICAL", true);
+        let preset = FilterPreset::from_criteria("CriticalErrors", &crit, Some("clf"));
+
+        mgr.add_preset(preset);
+        assert_eq!(mgr.presets.len(), 1);
+        assert_eq!(mgr.get_preset("CriticalErrors").unwrap().pattern, "CRITICAL");
+
+        // History management
+        mgr.record_history("query 1");
+        mgr.record_history("query 2");
+        mgr.record_history("query 1"); // Should move to front without duplication
+        assert_eq!(mgr.recent_history, vec!["query 1", "query 2"]);
+
+        // Serialization
+        let json = mgr.to_json();
+        assert!(json.contains("CriticalErrors"));
+        assert!(json.contains("query 1"));
+
+        mgr.clear_history();
+        assert!(mgr.recent_history.is_empty());
+        assert!(mgr.delete_preset("CriticalErrors"));
+        assert_eq!(mgr.presets.len(), 0);
     }
 }

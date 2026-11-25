@@ -16,7 +16,9 @@ pub mod workspace;
 pub use columnizer::{Columnizer, ColumnizerRegistry};
 pub use custom_columnizer::{CustomColumnizer, CustomParserType};
 pub use export::{ExportFormat, StreamingExporter};
-pub use filter::{EmptyColumnPolicy, FilterCriteria, FilterEngine, FilterMode};
+pub use filter::{
+    EmptyColumnPolicy, FilterCriteria, FilterEngine, FilterMode, FilterPreset, FilterPresetManager,
+};
 pub use filter_tab::FilteredDocumentSource;
 pub use highlight::{HighlightGroup, HighlightRule};
 pub use inspector::{InspectedRecord, InspectorField, LogInspector};
