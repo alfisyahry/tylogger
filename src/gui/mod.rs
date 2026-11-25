@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod dialogs;
 pub mod grid;
 pub mod markerbar;
 pub mod menu;
