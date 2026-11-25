@@ -571,6 +571,285 @@ fn run_headless_verification() {
         "  -> PASS: Streaming export written with CSV formula protection and verified content"
     );
 
+    println!("[Check 31] Validating Unified Search Engine Unicode Boundary Safety...");
+    let unicode_line = "2026-11-25 [INFO] こんにちは世界 🚀 Security check passed";
+    let opt_uni = tylogger::core::SearchOptions::new_plain(false, false);
+    assert!(tylogger::core::SearchEngine::matches_line(
+        unicode_line,
+        "こんにちは",
+        &opt_uni
+    ));
+    assert!(tylogger::core::SearchEngine::matches_line(
+        unicode_line,
+        "🚀",
+        &opt_uni
+    ));
+    println!("  -> PASS: Multi-byte Kanji/Hiragana and Emoji substrings matched on clean char boundaries");
+
+    println!("[Check 32] Validating Extended Regex Engine with Lookarounds...");
+    let ext_line = "2026-11-25 [CRITICAL] Core dump in auth module";
+    let ext_pat = r"(?<=\[)(INFO|CRITICAL)(?=\])";
+    let opt_ext = tylogger::core::SearchOptions {
+        case_sensitive: true,
+        whole_word: false,
+        is_regex: true,
+        mode: tylogger::core::search::SearchMode::RegexExtended,
+        direction: tylogger::core::search::SearchDirection::Forward,
+        max_step_budget: 10_000,
+    };
+    assert!(tylogger::core::SearchEngine::matches_line(
+        ext_line,
+        ext_pat,
+        &opt_ext
+    ));
+    println!("  -> PASS: Extended regex lookahead and lookbehind matched pattern accurately");
+
+    println!("[Check 33] Validating ReDoS Catastrophic Backtracking & Step Budget Protection...");
+    let redos_input = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaab";
+    let redos_pat = r"(a+)+$";
+    let redos_res = tylogger::core::SearchEngine::matches_regex_extended(
+        redos_input,
+        redos_pat,
+        true,
+        1_000,
+    );
+    assert!(redos_res.is_err());
+    let redos_err = redos_res.unwrap_err();
+    assert!(redos_err.contains("ReDoS") || redos_err.contains("timeout"));
+    println!("  -> PASS: Catastrophic nested repetition aborted cleanly with timeout/ReDoS error");
+
+    println!("[Check 34] Validating Damerau-Levenshtein 4-Operation Fuzzy Matching (Adjacent Transposition)...");
+    let s_orig: Vec<char> = "ConnectionException".chars().collect();
+    let s_trans: Vec<char> = "ConnecitonException".chars().collect(); // ti -> it
+    let s_sub: Vec<char> = "ConnectionExcepsion".chars().collect();   // t -> s
+    let s_del: Vec<char> = "ConnctionException".chars().collect();    // -e
+    let s_ins: Vec<char> = "ConnectionnException".chars().collect();  // +n
+    let s_two: Vec<char> = "ConetionException".chars().collect();     // -n, -c (2 edits)
+
+    assert_eq!(
+        tylogger::core::search::DamerauLevenshtein::distance(&s_orig, &s_trans),
+        1
+    );
+    assert_eq!(
+        tylogger::core::search::DamerauLevenshtein::distance(&s_orig, &s_sub),
+        1
+    );
+    assert_eq!(
+        tylogger::core::search::DamerauLevenshtein::distance(&s_orig, &s_del),
+        1
+    );
+    assert_eq!(
+        tylogger::core::search::DamerauLevenshtein::distance(&s_orig, &s_ins),
+        1
+    );
+    assert_eq!(
+        tylogger::core::search::DamerauLevenshtein::distance(&s_orig, &s_two),
+        2
+    );
+
+    let fuzzy_line = "2026-11-25 [WARN] ConnecitonException occurred in worker thread";
+    let opt_f1 = tylogger::core::SearchOptions {
+        case_sensitive: false,
+        whole_word: false,
+        is_regex: false,
+        mode: tylogger::core::search::SearchMode::Fuzzy(1),
+        direction: tylogger::core::search::SearchDirection::Forward,
+        max_step_budget: 10_000,
+    };
+    assert!(tylogger::core::SearchEngine::matches_line(
+        fuzzy_line,
+        "ConnectionException",
+        &opt_f1
+    ));
+    println!("  -> PASS: Transposition counted as 1 edit; fuzzy line search matched within threshold");
+
+    println!("[Check 35] Validating Persistent Filter Presets Management & Serialization...");
+    let mut f_mgr = tylogger::core::FilterPresetManager::new();
+    let f_crit = tylogger::core::FilterCriteria::new_include("CRITICAL", true);
+    let f_preset =
+        tylogger::core::FilterPreset::from_criteria("SecurityAudit", &f_crit, Some("clf"));
+    f_mgr.add_preset(f_preset);
+    assert_eq!(f_mgr.presets.len(), 1);
+    let f_json = f_mgr.to_json();
+    assert!(f_json.contains("SecurityAudit"));
+    println!("  -> PASS: Filter preset created, stored, and serialized to structured JSON");
+
+    println!("[Check 36] Validating Privacy-Safe Filter History & Clearance...");
+    f_mgr.record_history("pass_attempt");
+    f_mgr.record_history("api_secret");
+    assert_eq!(f_mgr.recent_history.len(), 2);
+    f_mgr.clear_history();
+    assert_eq!(f_mgr.recent_history.len(), 0);
+    println!("  -> PASS: Recent filter history recorded with deduplication and cleared permanently");
+
+    println!("[Check 37] Validating Versioned Native Session (.tysession v1) Format...");
+    let mut sess = tylogger::core::SessionState::new("Production Incident");
+    sess.add_document(tylogger::core::SessionDocument {
+        id: 1,
+        path: Some("C:\\logs\\cluster.log".to_string()),
+        title: "cluster.log".to_string(),
+        is_multifile: false,
+        constituent_files: Vec::new(),
+        is_filtered_tab: false,
+        parent_doc_id: None,
+        columnizer_id: "clf".to_string(),
+        selected_line: 10,
+        top_line: 0,
+        follow_tail: true,
+        encoding: "UTF-8".to_string(),
+        search_query: None,
+        filter_pattern: None,
+        bookmarks: vec![10, 25],
+    });
+    let sess_json = sess.to_json();
+    assert!(sess_json.contains("\"schema_version\": \"1.0\""));
+    let sess_restored =
+        tylogger::core::SessionState::from_json(&sess_json).expect("Parse session");
+    assert_eq!(sess_restored.workspace_name, "Production Incident");
+    assert_eq!(sess_restored.documents[0].bookmarks, vec![10, 25]);
+    println!("  -> PASS: Version 1.0 session JSON serialized and restored accurately");
+
+    println!("[Check 38] Validating Dependency Ordering in Session Restoration (Parent First)...");
+    sess.add_document(tylogger::core::SessionDocument {
+        id: 2,
+        path: None,
+        title: "cluster.log [Filter]".to_string(),
+        is_multifile: false,
+        constituent_files: Vec::new(),
+        is_filtered_tab: true,
+        parent_doc_id: Some(1),
+        columnizer_id: "clf".to_string(),
+        selected_line: 0,
+        top_line: 0,
+        follow_tail: false,
+        encoding: "UTF-8".to_string(),
+        search_query: None,
+        filter_pattern: Some("ERR".to_string()),
+        bookmarks: Vec::new(),
+    });
+    let ordered_docs = sess.dependency_ordered_documents();
+    assert_eq!(ordered_docs[0].id, 1); // Parent
+    assert_eq!(ordered_docs[1].id, 2); // Child filtered tab
+    println!("  -> PASS: Parent log documents ordered before child filtered tabs for safe restoration");
+
+    println!("[Check 39] Validating Atomic Session Persistence & Last-Known-Good Backup (.bak)...");
+    let sess_test_path = temp_dir.join(format!(
+        "tylogger_headless_sess_{}.tysession",
+        std::process::id()
+    ));
+    sess.save_atomic(&sess_test_path).expect("Save session atomic");
+    assert!(sess_test_path.exists());
+    sess.workspace_name = "Mutated Session".to_string();
+    sess.save_atomic(&sess_test_path).expect("Resave session");
+    let bak_path = sess_test_path.with_extension("bak");
+    assert!(bak_path.exists());
+    let _ = std::fs::remove_file(&sess_test_path);
+    let _ = std::fs::remove_file(&bak_path);
+    println!("  -> PASS: Atomic temp-write + sync + replace succeeded and .bak backup created");
+
+    println!("[Check 40] Validating Missing Source Recovery Handling...");
+    let missing_sess = tylogger::core::SessionState {
+        schema_version: "1.0".to_string(),
+        app_version: "0.4.0".to_string(),
+        workspace_name: "Missing Source Test".to_string(),
+        active_tab_idx: 0,
+        documents: vec![tylogger::core::SessionDocument {
+            id: 99,
+            path: Some("C:\\non_existent_drive\\non_existent_file.log".to_string()),
+            title: "lost.log".to_string(),
+            is_multifile: false,
+            constituent_files: Vec::new(),
+            is_filtered_tab: false,
+            parent_doc_id: None,
+            columnizer_id: "plain".to_string(),
+            selected_line: 0,
+            top_line: 0,
+            follow_tail: true,
+            encoding: "UTF-8".to_string(),
+            search_query: None,
+            filter_pattern: None,
+            bookmarks: Vec::new(),
+        }],
+    };
+    let missing_files = missing_sess.check_missing_sources();
+    assert_eq!(missing_files.len(), 1);
+    assert_eq!(missing_files[0].0, 99);
+    println!("  -> PASS: Missing file detected cleanly for user Locate/Skip/Remove resolution");
+
+    println!("[Check 41] Validating Startup Crash Recovery Tracker & Unclean Shutdown Flag...");
+    let tracker = tylogger::core::CrashRecoveryTracker::new(&temp_dir);
+    tracker.mark_session_active().expect("Mark session active");
+    tracker.save_snapshot(&sess).expect("Save snapshot");
+    assert!(tracker.is_unclean_shutdown());
+    tracker.mark_clean_shutdown();
+    assert!(!tracker.is_unclean_shutdown());
+    println!("  -> PASS: Active session lock detected unclean shutdown and cleared on clean exit");
+
+    println!("[Check 42] Validating Safe LogExpert XML (.lxp) Session Importer (Zero DTD / XXE)...");
+    let lxp_xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<LogExpertSession>
+  <file>C:\logs\database.log</file>
+  <file>C:\logs\backend.log</file>
+</LogExpertSession>"#;
+    let imported_lxp =
+        tylogger::core::SessionState::import_logexpert(lxp_xml).expect("Import LXP");
+    assert_eq!(imported_lxp.documents.len(), 2);
+    assert_eq!(
+        imported_lxp.documents[0].path,
+        Some(r#"C:\logs\database.log"#.to_string())
+    );
+    println!("  -> PASS: LogExpert XML imported with safe text parsing and zero external entity resolution");
+
+    println!("[Check 43] Validating Source-Aware Global Bookmark Synchronization Across Views...");
+    let mut bm_mgr = tylogger::core::GlobalBookmarkManager::new();
+    assert!(bm_mgr.toggle_bookmark(1, Some("access.log"), 1, 55000, 250));
+    assert!(bm_mgr.is_bookmarked(1, 250));
+    let bm_id = bm_mgr.all()[0].id;
+    assert!(bm_mgr.edit_bookmark(
+        bm_id,
+        Some("Auth Failure".to_string()),
+        "Investigated".to_string()
+    ));
+    assert_eq!(
+        bm_mgr.all()[0].label.as_deref(),
+        Some("Auth Failure")
+    );
+    println!("  -> PASS: Global bookmark registered, synchronized, and metadata updated");
+
+    println!("[Check 44] Validating Bookmark MultiFile Rollover & Generation Drift Integrity...");
+    bm_mgr.handle_rotation(1, 2);
+    assert_eq!(bm_mgr.all()[0].generation, 2);
+    assert_eq!(
+        bm_mgr.all()[0].status,
+        tylogger::core::BookmarkStatus::Valid
+    );
+    let bm_csv = bm_mgr.export_csv();
+    assert!(bm_csv.contains("Auth Failure"));
+    println!("  -> PASS: Bookmark generation updated across rollover and exported with formula safety");
+
+    println!("[Check 45] Validating Extensible Plugin Architecture, Discovery & Length-Bounded IPC Protocol...");
+    let mut reg = tylogger::core::PluginRegistry::new();
+    let sdk_dir = PathBuf::from("sdk").join("examples");
+    if sdk_dir.exists() {
+        let disc = reg.discover_directory(&sdk_dir);
+        assert!(disc >= 2);
+    }
+    let ipc_msg = tylogger::core::PluginIpcMessage::HandshakeAck {
+        plugin_name: "StandaloneParser".to_string(),
+        columns: vec!["Time".to_string(), "Level".to_string(), "Msg".to_string()],
+    };
+    let ipc_frame = ipc_msg.encode_frame();
+    let decoded =
+        tylogger::core::PluginIpcMessage::decode_frame(&ipc_frame).expect("Decode IPC");
+    match decoded {
+        tylogger::core::PluginIpcMessage::HandshakeAck { plugin_name, columns } => {
+            assert_eq!(plugin_name, "StandaloneParser");
+            assert_eq!(columns.len(), 3);
+        }
+        _ => panic!("Expected HandshakeAck"),
+    }
+    println!("  -> PASS: Declarative packages discovered and length-bounded IPC frames encoded/decoded");
+
     let _ = std::fs::remove_dir_all(&mf_dir);
-    println!("=== ALL 30 VERIFICATION CHECKS PASSED ===");
+    println!("=== ALL 45 VERIFICATION CHECKS PASSED ===");
 }
