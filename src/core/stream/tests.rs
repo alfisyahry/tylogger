@@ -105,4 +105,22 @@ mod tests {
         // Bookmark should have shifted from index 1 to index 0
         assert!(storage.is_bookmarked(0));
     }
+
+    #[test]
+    fn test_bounded_stream_storage_byte_budget_eviction() {
+        // Line limit 1000, but byte budget only 100 bytes
+        let mut storage = BoundedStreamStorage::with_byte_budget("srv1", "tail-follow", 1000, 100);
+        let line_40 = "123456789012345678901234567890123456789"; // 39 chars + 1 = 40 bytes
+        storage.append_line(line_40);
+        storage.append_line(line_40);
+        assert_eq!(storage.line_count(), 2);
+        assert_eq!(storage.current_memory_bytes(), 80);
+        assert!(!storage.is_history_evicted());
+
+        // Append 3rd 40-byte line: 80 + 40 = 120 > 100, must evict first line
+        storage.append_line(line_40);
+        assert_eq!(storage.line_count(), 2);
+        assert_eq!(storage.current_memory_bytes(), 80);
+        assert!(storage.is_history_evicted());
+    }
 }

@@ -15,6 +15,8 @@ pub struct BoundedStreamStorage {
     template_name: String,
     ring_buffer: VecDeque<String>,
     max_memory_lines: usize,
+    max_memory_bytes: usize,
+    current_memory_bytes: usize,
     total_received: u64,
     history_evicted: bool,
     bookmarks: Vec<usize>,
@@ -22,7 +24,18 @@ pub struct BoundedStreamStorage {
 }
 
 impl BoundedStreamStorage {
+    pub const DEFAULT_MAX_STREAM_BYTES: usize = 64 * 1024 * 1024; // 64 MB
+
     pub fn new(profile_id: &str, template_name: &str, max_memory_lines: usize) -> Self {
+        Self::with_byte_budget(profile_id, template_name, max_memory_lines, Self::DEFAULT_MAX_STREAM_BYTES)
+    }
+
+    pub fn with_byte_budget(
+        profile_id: &str,
+        template_name: &str,
+        max_memory_lines: usize,
+        max_memory_bytes: usize,
+    ) -> Self {
         Self {
             id: allocate_source_id(),
             generation: 1,
@@ -31,6 +44,8 @@ impl BoundedStreamStorage {
             template_name: template_name.to_string(),
             ring_buffer: VecDeque::with_capacity(max_memory_lines.min(50000)),
             max_memory_lines,
+            max_memory_bytes: max_memory_bytes.max(1),
+            current_memory_bytes: 0,
             total_received: 0,
             history_evicted: false,
             bookmarks: Vec::new(),
@@ -38,20 +53,50 @@ impl BoundedStreamStorage {
         }
     }
 
+    pub fn set_max_memory_bytes(&mut self, max_bytes: usize) {
+        self.max_memory_bytes = max_bytes.max(1);
+        while self.current_memory_bytes > self.max_memory_bytes && !self.ring_buffer.is_empty() {
+            if let Some(removed) = self.ring_buffer.pop_front() {
+                self.current_memory_bytes = self.current_memory_bytes.saturating_sub(removed.len() + 1);
+                self.history_evicted = true;
+                self.bookmarks.retain(|&idx| idx > 0);
+                for b in self.bookmarks.iter_mut() {
+                    *b -= 1;
+                }
+            }
+        }
+    }
+
+    pub fn current_memory_bytes(&self) -> usize {
+        self.current_memory_bytes
+    }
+
+    pub fn max_memory_bytes(&self) -> usize {
+        self.max_memory_bytes
+    }
+
     pub fn append_line(&mut self, line: &str) {
-        self.file_size_accumulated += line.len() as u64 + 1;
+        let line_len = line.len() + 1;
+        self.file_size_accumulated += line_len as u64;
         self.total_received += 1;
 
-        if self.ring_buffer.len() >= self.max_memory_lines {
-            self.ring_buffer.pop_front();
-            self.history_evicted = true;
-            // Adjust bookmarks on eviction
-            self.bookmarks.retain(|&idx| idx > 0);
-            for b in self.bookmarks.iter_mut() {
-                *b -= 1;
+        // Evict if line count limit or real byte-based budget is exceeded (AG-17, RSK-06)
+        while !self.ring_buffer.is_empty()
+            && (self.ring_buffer.len() >= self.max_memory_lines
+                || self.current_memory_bytes + line_len > self.max_memory_bytes)
+        {
+            if let Some(removed) = self.ring_buffer.pop_front() {
+                self.current_memory_bytes = self.current_memory_bytes.saturating_sub(removed.len() + 1);
+                self.history_evicted = true;
+                // Adjust bookmarks on eviction
+                self.bookmarks.retain(|&idx| idx > 0);
+                for b in self.bookmarks.iter_mut() {
+                    *b -= 1;
+                }
             }
         }
 
+        self.current_memory_bytes += line_len;
         self.ring_buffer.push_back(line.to_string());
     }
 
