@@ -6,10 +6,57 @@ pub const DEFAULT_GLOBAL_MEMORY_BUDGET: usize = 256 * 1024 * 1024;
 /// Maximum line length for UI preview/rendering: 1 MB.
 pub const MAX_LINE_PREVIEW_BYTES: usize = 1024 * 1024;
 
+/// Predefined tri-tier memory profiles for diverse deployment environments (AG-18, RSK-27).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MemoryProfile {
+    /// Optimized for memory-constrained x86 systems (64 MB budget, 16 MB stream ring).
+    LowMemory,
+    /// Default balanced profile for desktop workstations (256 MB budget, 64 MB stream ring).
+    #[default]
+    Balanced,
+    /// High-throughput profile for server environments and 64-bit multi-GB logs (1024 MB budget, 256 MB stream ring).
+    HighPerformance,
+}
+
+impl MemoryProfile {
+    pub fn total_budget_bytes(&self) -> usize {
+        match self {
+            Self::LowMemory => 64 * 1024 * 1024,
+            Self::Balanced => 256 * 1024 * 1024,
+            Self::HighPerformance => 1024 * 1024 * 1024,
+        }
+    }
+
+    pub fn max_stream_bytes(&self) -> usize {
+        match self {
+            Self::LowMemory => 16 * 1024 * 1024,
+            Self::Balanced => 64 * 1024 * 1024,
+            Self::HighPerformance => 256 * 1024 * 1024,
+        }
+    }
+
+    pub fn max_stream_lines(&self) -> usize {
+        match self {
+            Self::LowMemory => 10_000,
+            Self::Balanced => 50_000,
+            Self::HighPerformance => 200_000,
+        }
+    }
+
+    pub fn max_lru_cache_bytes(&self) -> usize {
+        match self {
+            Self::LowMemory => 16 * 1024 * 1024,
+            Self::Balanced => 64 * 1024 * 1024,
+            Self::HighPerformance => 256 * 1024 * 1024,
+        }
+    }
+}
+
 /// Centralized memory budget manager that coordinates memory allocation
 /// across open documents, raw readers, parsed column caches, and filter results.
 #[derive(Debug)]
 pub struct GlobalMemoryBudget {
+    profile: MemoryProfile,
     total_budget: usize,
     raw_cache_bytes: AtomicUsize,
     decoded_lines_bytes: AtomicUsize,
@@ -20,13 +67,14 @@ pub struct GlobalMemoryBudget {
 
 impl Default for GlobalMemoryBudget {
     fn default() -> Self {
-        Self::new(DEFAULT_GLOBAL_MEMORY_BUDGET)
+        Self::from_profile(MemoryProfile::Balanced)
     }
 }
 
 impl GlobalMemoryBudget {
     pub fn new(total_budget: usize) -> Self {
         Self {
+            profile: MemoryProfile::Balanced,
             total_budget: total_budget.max(1024 * 1024),
             raw_cache_bytes: AtomicUsize::new(0),
             decoded_lines_bytes: AtomicUsize::new(0),
@@ -34,6 +82,31 @@ impl GlobalMemoryBudget {
             filter_index_bytes: AtomicUsize::new(0),
             highlight_marker_bytes: AtomicUsize::new(0),
         }
+    }
+
+    pub fn from_profile(profile: MemoryProfile) -> Self {
+        Self {
+            profile,
+            total_budget: profile.total_budget_bytes(),
+            raw_cache_bytes: AtomicUsize::new(0),
+            decoded_lines_bytes: AtomicUsize::new(0),
+            parsed_columns_bytes: AtomicUsize::new(0),
+            filter_index_bytes: AtomicUsize::new(0),
+            highlight_marker_bytes: AtomicUsize::new(0),
+        }
+    }
+
+    pub fn profile(&self) -> MemoryProfile {
+        self.profile
+    }
+
+    pub fn set_profile(&mut self, profile: MemoryProfile) {
+        self.profile = profile;
+        self.total_budget = profile.total_budget_bytes();
+    }
+
+    pub fn set_total_budget(&mut self, bytes: usize) {
+        self.total_budget = bytes.max(1024 * 1024);
     }
 
     pub fn total_budget(&self) -> usize {
@@ -179,5 +252,20 @@ mod tests {
         assert!(truncated);
         assert!(preview.starts_with(&"A".repeat(100)));
         assert!(preview.contains("[Truncated: 500 bytes total"));
+    }
+
+    #[test]
+    fn test_tri_tier_memory_profiles() {
+        let mut budget = GlobalMemoryBudget::from_profile(MemoryProfile::LowMemory);
+        assert_eq!(budget.total_budget(), 64 * 1024 * 1024);
+        assert_eq!(budget.profile(), MemoryProfile::LowMemory);
+
+        budget.set_profile(MemoryProfile::Balanced);
+        assert_eq!(budget.total_budget(), 256 * 1024 * 1024);
+        assert_eq!(budget.profile(), MemoryProfile::Balanced);
+
+        budget.set_profile(MemoryProfile::HighPerformance);
+        assert_eq!(budget.total_budget(), 1024 * 1024 * 1024);
+        assert_eq!(budget.profile(), MemoryProfile::HighPerformance);
     }
 }

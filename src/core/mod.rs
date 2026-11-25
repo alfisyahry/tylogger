@@ -62,7 +62,7 @@ pub use filter::{
 pub use filter_tab::FilteredDocumentSource;
 pub use highlight::{HighlightGroup, HighlightRule};
 pub use inspector::{InspectedRecord, InspectorField, LogInspector};
-pub use memory::{format_safe_preview_line, GlobalMemoryBudget};
+pub use memory::{format_safe_preview_line, GlobalMemoryBudget, MemoryProfile};
 pub use merge::{
     BoundedKWayMerger, LiveLogMergeEngine, LiveMergeMetrics, MergeCandidate, MergedLogSource,
     RecordProvenance, SourceAlias,
