@@ -26,6 +26,34 @@ pub struct SessionDocument {
     pub is_merged_source: bool,
 }
 
+impl SessionDocument {
+    pub fn new_file(path: &str) -> Self {
+        Self {
+            id: 0,
+            path: Some(path.to_string()),
+            title: std::path::Path::new(path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Log".to_string()),
+            is_multifile: false,
+            constituent_files: Vec::new(),
+            is_filtered_tab: false,
+            parent_doc_id: None,
+            columnizer_id: "default".to_string(),
+            selected_line: 0,
+            top_line: 0,
+            follow_tail: true,
+            encoding: "utf-8".to_string(),
+            search_query: None,
+            filter_pattern: None,
+            bookmarks: Vec::new(),
+            timeshift_offset_nanos: 0,
+            sync_group_id: None,
+            is_merged_source: false,
+        }
+    }
+}
+
 /// Versioned Tylogger session state (.tysession and .tyworkspace v1, v2, and v3).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SessionState {
@@ -48,7 +76,7 @@ impl Default for SessionState {
     fn default() -> Self {
         Self {
             schema_version: "3.0".to_string(),
-            app_version: "0.6.0".to_string(),
+            app_version: "0.9.0".to_string(),
             workspace_name: "Default Workspace".to_string(),
             active_tab_idx: 0,
             split_view_active: false,
@@ -110,7 +138,7 @@ impl SessionState {
     pub fn new_v3(name: &str) -> Self {
         Self {
             schema_version: "3.0".to_string(),
-            app_version: "0.6.0".to_string(),
+            app_version: "0.9.0".to_string(),
             workspace_name: name.to_string(),
             active_tab_idx: 0,
             split_view_active: false,
@@ -144,6 +172,32 @@ impl SessionState {
 
         parents.extend(children);
         parents
+    }
+
+    /// Restores session documents with support for deferring background tabs (AG-14).
+    /// Returns (loaded_count, deferred_count).
+    pub fn restore_workspace_deferred(
+        &self,
+        workspace: &mut crate::core::workspace::Workspace,
+        max_immediate_docs: usize,
+    ) -> (usize, usize) {
+        let ordered = self.dependency_ordered_documents();
+        let mut loaded = 0;
+        let mut deferred = 0;
+
+        for (idx, doc_state) in ordered.iter().enumerate() {
+            if idx < max_immediate_docs || idx == self.active_tab_idx {
+                if let Some(ref path) = doc_state.path {
+                    if workspace.open_file(std::path::Path::new(path)).is_ok() {
+                        loaded += 1;
+                        continue;
+                    }
+                }
+            } else {
+                deferred += 1;
+            }
+        }
+        (loaded, deferred)
     }
 
     /// Serializes session state to structured JSON.
@@ -814,5 +868,26 @@ mod tests {
             imported.documents[1].path,
             Some(r#"D:\app\audit.log"#.to_string())
         );
+    }
+
+    #[test]
+    fn test_deferred_workspace_restoration() {
+        let mut session = SessionState::new_v3("Deferred Test");
+        let mut d1 = SessionDocument::new_file(r#"C:\nonexistent_1.log"#);
+        d1.is_filtered_tab = false;
+        let mut d2 = SessionDocument::new_file(r#"C:\nonexistent_2.log"#);
+        d2.is_filtered_tab = false;
+        let mut d3 = SessionDocument::new_file(r#"C:\nonexistent_3.log"#);
+        d3.is_filtered_tab = false;
+        session.add_document(d1);
+        session.add_document(d2);
+        session.add_document(d3);
+        session.active_tab_idx = 0;
+
+        let mut ws = crate::core::workspace::Workspace::new();
+        let (loaded, deferred) = session.restore_workspace_deferred(&mut ws, 1);
+        // nonexistent files fail to open, but deferred tabs are calculated properly
+        assert_eq!(loaded, 0);
+        assert_eq!(deferred, 2);
     }
 }
