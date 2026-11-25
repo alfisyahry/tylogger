@@ -136,6 +136,32 @@ pub fn show_export_info_dialog(hwnd: HWND, path: &str, line_count: usize) {
     }
 }
 
+/// Displays Global Bookmark Manager summary dialog.
+pub fn show_bookmark_manager_dialog(
+    hwnd: HWND,
+    mgr: &crate::core::bookmark::GlobalBookmarkManager,
+) {
+    let title: Vec<u16> = "Global Bookmark Manager\0".encode_utf16().collect();
+    let message = format!(
+        "Global Bookmark Manager:\n\n\
+        • Total Bookmarks: {}\n\
+        • Synchronized Views: Original Documents <-> Filter-to-Tab\n\
+        • Rotation Integrity: Preserved across MultiFile rollover\n\
+        • Actions Available: Jump, Edit Label/Comment, Clear Invalid, Export/Import CSV\0",
+        mgr.count()
+    );
+    let msg_wide: Vec<u16> = message.encode_utf16().collect();
+
+    unsafe {
+        MessageBoxW(
+            hwnd,
+            msg_wide.as_ptr(),
+            title.as_ptr(),
+            MB_OK | MB_ICONINFORMATION,
+        );
+    }
+}
+
 /// Parses and validates a line number for Jump to Line navigation.
 pub fn parse_jump_target(input: &str, max_lines: usize) -> Option<usize> {
     if let Ok(num) = input.trim().parse::<usize>() {

@@ -1,3 +1,4 @@
+pub mod bookmark;
 pub mod columnizer;
 pub mod custom_columnizer;
 pub mod export;
@@ -14,6 +15,7 @@ pub mod session;
 pub mod source;
 pub mod workspace;
 
+pub use bookmark::{Bookmark, BookmarkStatus, GlobalBookmarkManager};
 pub use columnizer::{Columnizer, ColumnizerRegistry};
 pub use custom_columnizer::{CustomColumnizer, CustomParserType};
 pub use export::{ExportFormat, StreamingExporter};
