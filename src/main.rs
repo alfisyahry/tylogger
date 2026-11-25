@@ -5,6 +5,9 @@ use tylogger::core::{Columnizer, NonLockingLogReader};
 use tylogger::gui::window::{run_gui_app, AppState};
 
 fn main() {
+    // Enforce safe DLL search order to prevent search-order hijacking (RSK-26, AG-08, AG-28)
+    let _ = tylogger::core::compat::enforce_safe_dll_search_order();
+
     let args: Vec<String> = env::args().collect();
 
     if args.iter().any(|a| a == "--help" || a == "-h") {

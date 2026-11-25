@@ -95,7 +95,10 @@ pub use trigger::{
     ActionHistoryEntry, BoundedActionHistory, BoundedActionQueue, GlobalTriggerDeduplicator,
     KeywordTriggerRule, QueuedAction, TriggerAction, TriggerEngine, TriggerExecutionKey,
 };
-pub use compat::{fill_secure_random, verify_delay_load_runtime_safety, Win32SyncEvent};
+pub use compat::{
+    enforce_safe_dll_search_order, fill_secure_random, verify_delay_load_runtime_safety,
+    Win32SyncEvent,
+};
 pub use workspace::{Document, Workspace};
 
 pub use archive::{

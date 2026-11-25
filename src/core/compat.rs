@@ -122,6 +122,25 @@ pub fn fill_secure_random(buf: &mut [u8]) -> Result<(), String> {
     Err("Failed to generate secure random bytes using bcrypt or advapi32 fallback".to_string())
 }
 
+/// Enforces safe DLL search order via `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32)`
+/// to mitigate DLL Search-Order Hijacking (RSK-26, AG-08, AG-28).
+/// Dynamically resolves the API to remain 100% compatible with unpatched Windows 7 SP1.
+pub fn enforce_safe_dll_search_order() -> bool {
+    const LOAD_LIBRARY_SEARCH_SYSTEM32: u32 = 0x00000800;
+    unsafe {
+        let kernel32 = GetModuleHandleA(b"kernel32.dll\0".as_ptr());
+        if !kernel32.is_null() {
+            let func = GetProcAddress(kernel32, b"SetDefaultDllDirectories\0".as_ptr());
+            if let Some(proc) = func {
+                type SetDefaultDllDirectoriesFn = unsafe extern "system" fn(u32) -> i32;
+                let set_dirs: SetDefaultDllDirectoriesFn = std::mem::transmute(proc);
+                return set_dirs(LOAD_LIBRARY_SEARCH_SYSTEM32) != 0;
+            }
+        }
+    }
+    false
+}
+
 /// Fallback check verifying that delay-load shims resolve cleanly without hard crashing.
 pub fn verify_delay_load_runtime_safety() -> bool {
     let mut entropy = [0u8; 16];
@@ -163,5 +182,11 @@ mod tests {
     #[test]
     fn test_delay_load_runtime_safety() {
         assert!(verify_delay_load_runtime_safety());
+    }
+
+    #[test]
+    fn test_safe_dll_search_order() {
+        // Must execute cleanly without crashing on any Windows version
+        let _ = enforce_safe_dll_search_order();
     }
 }
