@@ -24,24 +24,41 @@ pub enum UpdateEvent {
 /// 64 lines per checkpoint yields < 1.3 MB RAM per 10 million lines.
 pub const CHECKPOINT_STRIDE: usize = 64;
 
-/// Default capacity for bounded decoded line LRU cache.
+/// Default capacity for bounded decoded line LRU cache (10,000 entries).
 pub const DEFAULT_CACHE_CAPACITY: usize = 10_000;
 
+/// Default byte budget for decoded line LRU cache (64 MB).
+pub const DEFAULT_CACHE_BYTE_BUDGET: usize = 64 * 1024 * 1024;
+
+/// Maximum display bytes for an individual log line before truncation (1 MB).
+/// Prevents multi-megabyte single lines from exhausting RAM.
+pub const MAX_LINE_DISPLAY_BYTES: usize = 1024 * 1024;
+
 /// Bounded Least-Recently-Used (LRU) line cache for decoded log line strings.
+/// Enforces both maximum entry count and total byte budget constraints.
 pub struct LruLineCache {
-    capacity: usize,
+    max_entries: usize,
+    max_bytes: usize,
+    current_bytes: usize,
     map: HashMap<usize, String>,
     order: VecDeque<usize>,
 }
 
 impl LruLineCache {
-    pub fn new(capacity: usize) -> Self {
-        let cap = capacity.max(1);
+    pub fn new(max_entries: usize, max_bytes: usize) -> Self {
+        let entries = max_entries.max(1);
+        let bytes = max_bytes.max(1);
         Self {
-            capacity: cap,
-            map: HashMap::with_capacity(cap.min(1024)),
-            order: VecDeque::with_capacity(cap.min(1024)),
+            max_entries: entries,
+            max_bytes: bytes,
+            current_bytes: 0,
+            map: HashMap::with_capacity(entries.min(1024)),
+            order: VecDeque::with_capacity(entries.min(1024)),
         }
+    }
+
+    pub fn with_default_budget() -> Self {
+        Self::new(DEFAULT_CACHE_CAPACITY, DEFAULT_CACHE_BYTE_BUDGET)
     }
 
     pub fn get(&mut self, line_idx: usize) -> Option<&String> {
@@ -58,28 +75,38 @@ impl LruLineCache {
     }
 
     pub fn insert(&mut self, line_idx: usize, text: String) {
-        if self.map.contains_key(&line_idx) {
+        let entry_size = text.len() + std::mem::size_of::<usize>() * 4;
+
+        if let Some(old_text) = self.map.remove(&line_idx) {
+            let old_size = old_text.len() + std::mem::size_of::<usize>() * 4;
+            self.current_bytes = self.current_bytes.saturating_sub(old_size);
             if let Some(pos) = self.order.iter().position(|&k| k == line_idx) {
                 self.order.remove(pos);
             }
-            self.order.push_back(line_idx);
-            self.map.insert(line_idx, text);
-            return;
         }
 
-        if self.map.len() >= self.capacity {
+        // Evict until both entry count and byte budget are satisfied
+        while (!self.order.is_empty())
+            && (self.map.len() >= self.max_entries
+                || (self.current_bytes + entry_size > self.max_bytes && !self.map.is_empty()))
+        {
             if let Some(oldest) = self.order.pop_front() {
-                self.map.remove(&oldest);
+                if let Some(removed) = self.map.remove(&oldest) {
+                    let rem_size = removed.len() + std::mem::size_of::<usize>() * 4;
+                    self.current_bytes = self.current_bytes.saturating_sub(rem_size);
+                }
             }
         }
 
         self.order.push_back(line_idx);
+        self.current_bytes += entry_size;
         self.map.insert(line_idx, text);
     }
 
     pub fn clear(&mut self) {
         self.map.clear();
         self.order.clear();
+        self.current_bytes = 0;
     }
 
     pub fn len(&self) -> usize {
@@ -88,6 +115,30 @@ impl LruLineCache {
 
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
+    }
+
+    pub fn current_bytes(&self) -> usize {
+        self.current_bytes
+    }
+
+    pub fn max_bytes(&self) -> usize {
+        self.max_bytes
+    }
+
+    pub fn set_budget(&mut self, max_entries: usize, max_bytes: usize) {
+        self.max_entries = max_entries.max(1);
+        self.max_bytes = max_bytes.max(1);
+
+        while (!self.order.is_empty())
+            && (self.map.len() > self.max_entries || self.current_bytes > self.max_bytes)
+        {
+            if let Some(oldest) = self.order.pop_front() {
+                if let Some(removed) = self.map.remove(&oldest) {
+                    let rem_size = removed.len() + std::mem::size_of::<usize>() * 4;
+                    self.current_bytes = self.current_bytes.saturating_sub(rem_size);
+                }
+            }
+        }
     }
 }
 
@@ -352,7 +403,7 @@ impl NonLockingLogReader {
             handle,
             file_size,
             index: SparseLineIndex::new(),
-            cache: LruLineCache::new(DEFAULT_CACHE_CAPACITY),
+            cache: LruLineCache::with_default_budget(),
             backend,
             bookmarks: Vec::new(),
             mock_lines: None,
@@ -377,7 +428,7 @@ impl NonLockingLogReader {
             handle: INVALID_HANDLE_VALUE,
             file_size: curr_offset,
             index,
-            cache: LruLineCache::new(DEFAULT_CACHE_CAPACITY),
+            cache: LruLineCache::with_default_budget(),
             backend: StorageBackend::BufferedFile,
             bookmarks: Vec::new(),
             mock_lines: Some(string_lines),
@@ -601,18 +652,43 @@ impl NonLockingLogReader {
             0
         };
 
-        let raw_bytes = self.backend.read_bytes(self.handle, line_start, length)?;
+        let is_truncated = length > MAX_LINE_DISPLAY_BYTES;
+        let read_len = if is_truncated {
+            MAX_LINE_DISPLAY_BYTES
+        } else {
+            length
+        };
+
+        let raw_bytes = self.backend.read_bytes(self.handle, line_start, read_len)?;
 
         // Defensive UTF-8 lossy conversion with trailing carriage return stripped
         let mut line_text = String::from_utf8_lossy(&raw_bytes).to_string();
         if line_text.ends_with('\r') {
             line_text.pop();
         }
+        if is_truncated {
+            line_text.push_str(" [Truncated]");
+        }
 
         // Cache the decoded line
         self.cache.insert(index, line_text.clone());
 
         Ok(line_text)
+    }
+
+    /// Sets cache capacity and byte budget.
+    pub fn set_cache_budget(&mut self, max_entries: usize, max_bytes: usize) {
+        self.cache.set_budget(max_entries, max_bytes);
+    }
+
+    /// Current bytes allocated by the decoded line cache.
+    pub fn cache_bytes(&self) -> usize {
+        self.cache.current_bytes()
+    }
+
+    /// Number of items currently cached in the decoded line cache.
+    pub fn cache_len(&self) -> usize {
+        self.cache.len()
     }
 
     fn query_file_size(&self) -> Result<u64, String> {
@@ -661,7 +737,7 @@ mod tests {
 
     #[test]
     fn test_lru_line_cache() {
-        let mut cache = LruLineCache::new(3);
+        let mut cache = LruLineCache::new(3, 1024 * 1024);
         cache.insert(1, "one".to_string());
         cache.insert(2, "two".to_string());
         cache.insert(3, "three".to_string());
@@ -677,6 +753,27 @@ mod tests {
         assert_eq!(cache.get(1).map(|s| s.as_str()), Some("one"));
         assert_eq!(cache.get(3).map(|s| s.as_str()), Some("three"));
         assert_eq!(cache.get(4).map(|s| s.as_str()), Some("four"));
+    }
+
+    #[test]
+    fn test_lru_line_cache_byte_budget() {
+        // Budget allows approx 250 bytes (enough for 2 lines of 80 chars + overhead)
+        let mut cache = LruLineCache::new(100, 250);
+        let large_line_1 = "A".repeat(80);
+        let large_line_2 = "B".repeat(80);
+        let large_line_3 = "C".repeat(80);
+
+        cache.insert(1, large_line_1);
+        cache.insert(2, large_line_2);
+        assert_eq!(cache.len(), 2);
+        assert!(cache.current_bytes() <= 250);
+
+        // Inserting line 3 should evict line 1 due to byte budget constraint
+        cache.insert(3, large_line_3);
+        assert!(cache.current_bytes() <= 250);
+        assert_eq!(cache.get(1), None);
+        assert!(cache.get(2).is_some());
+        assert!(cache.get(3).is_some());
     }
 
     #[test]
