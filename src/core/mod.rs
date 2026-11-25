@@ -1,7 +1,11 @@
+pub mod analytics;
+pub mod anomaly;
 pub mod bookmark;
 pub mod columnizer;
+pub mod compare;
 pub mod correlation;
 pub mod custom_columnizer;
+pub mod domain;
 pub mod export;
 pub mod filter;
 pub mod filter_tab;
@@ -11,6 +15,7 @@ pub mod memory;
 pub mod merge;
 pub mod multifile;
 pub mod multiline;
+pub mod pattern;
 pub mod plugin;
 pub mod reader;
 pub mod search;
@@ -22,6 +27,22 @@ pub mod time;
 pub mod tools;
 pub mod trigger;
 pub mod workspace;
+
+pub use analytics::{
+    AggregateField, AggregationResult, AggregationType, AnalyticsEngine, AnalyticsPreset,
+    AnalyticsQuery, BucketInterval, BucketStats, CountMinSketch, EvaluationMode, FilterCondition,
+    HyperLogLog, MetricRow, PresetManager, QueryOperator, SpaceSavingTopK, SparseTimeBucketer,
+    TimeRangeFilter,
+};
+pub use anomaly::{AnomalyPoint, RollingBaselineDetector};
+pub use compare::{ComparisonEngine, DatasetComparisonSummary, KeyComparison};
+pub use domain::{
+    CanonicalIp, EndpointAnalytics, HttpStatusAnalytics, HttpStatusDistribution, IpAnalytics,
+    LatencyAnalytics, LatencyQuantiles, NormalizedEndpoint, SecurityObservation,
+    SecurityPresetAnalyzer, TrustedProxyPolicy,
+};
+pub use export::{OfflineReportGenerator, PrivacyFilter, PrivacyMaskingOptions};
+pub use pattern::{DynamicTokenizer, PatternGrouper, PatternTemplate};
 
 pub use bookmark::{Bookmark, BookmarkStatus, GlobalBookmarkManager};
 pub use columnizer::{Columnizer, ColumnizerRegistry};

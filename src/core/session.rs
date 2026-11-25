@@ -26,7 +26,7 @@ pub struct SessionDocument {
     pub is_merged_source: bool,
 }
 
-/// Versioned Tylogger session state (.tysession and .tyworkspace v1 and v2).
+/// Versioned Tylogger session state (.tysession and .tyworkspace v1, v2, and v3).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SessionState {
     pub schema_version: String,
@@ -37,20 +37,27 @@ pub struct SessionState {
     pub split_orientation: String,
     pub split_secondary_doc_id: Option<usize>,
     pub split_ratio: f32,
+    // Phase 6 additions
+    pub analytics_workspace_open: bool,
+    pub active_analytics_query: Option<String>,
+    pub analytics_preset_id: Option<String>,
     pub documents: Vec<SessionDocument>,
 }
 
 impl Default for SessionState {
     fn default() -> Self {
         Self {
-            schema_version: "2.0".to_string(),
-            app_version: "0.5.0".to_string(),
+            schema_version: "3.0".to_string(),
+            app_version: "0.6.0".to_string(),
             workspace_name: "Default Workspace".to_string(),
             active_tab_idx: 0,
             split_view_active: false,
             split_orientation: "Horizontal".to_string(),
             split_secondary_doc_id: None,
             split_ratio: 0.5,
+            analytics_workspace_open: false,
+            active_analytics_query: None,
+            analytics_preset_id: None,
             documents: Vec::new(),
         }
     }
@@ -76,6 +83,9 @@ impl SessionState {
             split_orientation: "Horizontal".to_string(),
             split_secondary_doc_id: None,
             split_ratio: 0.5,
+            analytics_workspace_open: false,
+            active_analytics_query: None,
+            analytics_preset_id: None,
             documents: Vec::new(),
         }
     }
@@ -90,6 +100,26 @@ impl SessionState {
             split_orientation: "Horizontal".to_string(),
             split_secondary_doc_id: None,
             split_ratio: 0.5,
+            analytics_workspace_open: false,
+            active_analytics_query: None,
+            analytics_preset_id: None,
+            documents: Vec::new(),
+        }
+    }
+
+    pub fn new_v3(name: &str) -> Self {
+        Self {
+            schema_version: "3.0".to_string(),
+            app_version: "0.6.0".to_string(),
+            workspace_name: name.to_string(),
+            active_tab_idx: 0,
+            split_view_active: false,
+            split_orientation: "Horizontal".to_string(),
+            split_secondary_doc_id: None,
+            split_ratio: 0.5,
+            analytics_workspace_open: false,
+            active_analytics_query: None,
+            analytics_preset_id: None,
             documents: Vec::new(),
         }
     }
@@ -143,6 +173,23 @@ impl SessionState {
             out.push_str("  \"split_secondary_doc_id\": null,\n");
         }
         out.push_str(&format!("  \"split_ratio\": {:.2},\n", self.split_ratio));
+        out.push_str(&format!(
+            "  \"analytics_workspace_open\": {},\n",
+            self.analytics_workspace_open
+        ));
+        if let Some(q) = &self.active_analytics_query {
+            out.push_str(&format!(
+                "  \"active_analytics_query\": \"{}\",\n",
+                q.replace('\\', "\\\\").replace('"', "\\\"")
+            ));
+        } else {
+            out.push_str("  \"active_analytics_query\": null,\n");
+        }
+        if let Some(p) = &self.analytics_preset_id {
+            out.push_str(&format!("  \"analytics_preset_id\": \"{}\",\n", p));
+        } else {
+            out.push_str("  \"analytics_preset_id\": null,\n");
+        }
         out.push_str("  \"documents\": [\n");
 
         for (i, doc) in self.documents.iter().enumerate() {
@@ -253,6 +300,15 @@ impl SessionState {
         }
         if let Some(sr) = extract_f32_val(json, "\"split_ratio\":") {
             state.split_ratio = sr;
+        }
+        if let Some(awo) = extract_bool_val(json, "\"analytics_workspace_open\":") {
+            state.analytics_workspace_open = awo;
+        }
+        if let Some(aaq) = extract_string_val(json, "\"active_analytics_query\":") {
+            state.active_analytics_query = Some(aaq);
+        }
+        if let Some(api) = extract_string_val(json, "\"analytics_preset_id\":") {
+            state.analytics_preset_id = Some(api);
         }
 
         // Parse documents array
@@ -664,6 +720,29 @@ mod tests {
         assert_eq!(migrated.documents[0].timeshift_offset_nanos, 0);
         assert_eq!(migrated.documents[0].sync_group_id, None);
         assert_eq!(migrated.documents[0].bookmarks, vec![10, 20]);
+    }
+
+    #[test]
+    fn test_schema_v2_to_v3_migration() {
+        // Legacy v2.0 session JSON without analytics workspace fields
+        let v2_json = r#"{
+  "schema_version": "2.0",
+  "app_version": "0.5.0",
+  "workspace_name": "Phase 5 Session",
+  "active_tab_idx": 0,
+  "split_view_active": true,
+  "split_orientation": "Horizontal",
+  "split_secondary_doc_id": null,
+  "split_ratio": 0.50,
+  "documents": []
+}"#;
+
+        let migrated = SessionState::from_json(v2_json).expect("Migrate v2.0 session");
+        assert_eq!(migrated.workspace_name, "Phase 5 Session");
+        assert_eq!(migrated.schema_version, "2.0");
+        assert_eq!(migrated.analytics_workspace_open, false);
+        assert_eq!(migrated.active_analytics_query, None);
+        assert_eq!(migrated.analytics_preset_id, None);
     }
 
     #[test]

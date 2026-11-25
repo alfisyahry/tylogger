@@ -1,9 +1,15 @@
+pub mod privacy;
+pub mod report;
+
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
 use crate::core::columnizer::Columnizer;
 use crate::core::source::LogSource;
+
+pub use privacy::{PrivacyFilter, PrivacyMaskingOptions};
+pub use report::OfflineReportGenerator;
 
 /// Supported export formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -269,7 +269,47 @@ pub fn create_main_menu() -> HMENU {
             to_wide("&Tools").as_ptr(),
         );
 
-        // 6. Help Menu
+        // 6. Analytics Menu
+        let analytics_menu = CreatePopupMenu();
+        AppendMenuW(
+            analytics_menu,
+            MF_STRING,
+            ID_ANALYTICS_WORKSPACE as usize,
+            to_wide("&Analytics Workspace...\tCtrl+Shift+A").as_ptr(),
+        );
+        AppendMenuW(
+            analytics_menu,
+            MF_STRING,
+            ID_ANALYTICS_QUERY_BUILDER as usize,
+            to_wide("&Query Builder...\tCtrl+Q").as_ptr(),
+        );
+        AppendMenuW(
+            analytics_menu,
+            MF_STRING,
+            ID_ANALYTICS_COMPARE_LOGS as usize,
+            to_wide("&Compare Log Datasets...\tCtrl+Shift+C").as_ptr(),
+        );
+        AppendMenuW(
+            analytics_menu,
+            MF_STRING,
+            ID_ANALYTICS_EXPORT_REPORT as usize,
+            to_wide("&Generate Offline Report...\tCtrl+Shift+R").as_ptr(),
+        );
+        AppendMenuW(analytics_menu, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(
+            analytics_menu,
+            MF_STRING,
+            ID_ANALYTICS_TIMELINE_TOGGLE as usize,
+            to_wide("Toggle Activity &Timeline\tF11").as_ptr(),
+        );
+        AppendMenuW(
+            menu_bar,
+            MF_POPUP,
+            analytics_menu as usize,
+            to_wide("&Analytics").as_ptr(),
+        );
+
+        // 7. Help Menu
         let help_menu = CreatePopupMenu();
         AppendMenuW(
             help_menu,

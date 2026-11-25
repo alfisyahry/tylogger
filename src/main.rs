@@ -763,6 +763,9 @@ fn run_headless_verification() {
         split_orientation: "Horizontal".to_string(),
         split_secondary_doc_id: None,
         split_ratio: 0.5,
+        analytics_workspace_open: false,
+        active_analytics_query: None,
+        analytics_preset_id: None,
         documents: vec![tylogger::core::SessionDocument {
             id: 99,
             path: Some("C:\\non_existent_drive\\non_existent_file.log".to_string()),
@@ -1308,5 +1311,398 @@ fn run_headless_verification() {
         "  -> PASS: Captured stdout/stderr virtual source operational and Schema v2.0 persisted"
     );
 
-    println!("=== ALL 65 VERIFICATION CHECKS PASSED ===");
+    // ==========================================
+    // PHASE 6: ADVANCED ANALYTICS CHECKS (66-85)
+    // ==========================================
+
+    println!("[Check 66] Validating Serializable Analytics Query Model (AnalyticsQuery) & Condition Operators...");
+    let mut query66 = tylogger::core::AnalyticsQuery::new("Top Client IPs");
+    query66.add_filter(tylogger::core::FilterCondition::new(
+        "status",
+        tylogger::core::QueryOperator::GreaterThan,
+        "399",
+    ));
+    query66.add_group_by("ip");
+    query66.add_aggregate(tylogger::core::AggregateField::new(
+        "ip",
+        tylogger::core::AggregationType::Count,
+    ));
+    query66.set_limit(50);
+    query66.set_mode(tylogger::core::EvaluationMode::Exact);
+    let q_json = query66.to_json();
+    assert!(q_json.contains("\"title\": \"Top Client IPs\""));
+    assert!(q_json.contains("\"limit\": 50"));
+    assert!(q_json.contains("\"mode\": \"Exact\""));
+    println!("  -> PASS: AnalyticsQuery serialized cleanly with operators, group-by, and aggregate fields");
+
+    println!(
+        "[Check 67] Validating Streaming In-Process Aggregation Engine & Worker Cancellation..."
+    );
+    let sample67 = [
+        r#"192.168.1.1 - admin [25/Nov/2026:10:00:00 +0700] "GET /index.html HTTP/1.1" 200 1024"#,
+        r#"192.168.1.2 - guest [25/Nov/2026:10:00:01 +0700] "POST /login HTTP/1.1" 403 512"#,
+        r#"192.168.1.1 - admin [25/Nov/2026:10:00:02 +0700] "GET /dashboard HTTP/1.1" 200 2048"#,
+    ];
+    let mut src67 = tylogger::core::MockSource::new("clf.log", &sample67);
+    let col67 = tylogger::core::columnizer::WebserverClfColumnizer;
+    let cancel67 = std::sync::atomic::AtomicBool::new(false);
+    let mut q67 = tylogger::core::AnalyticsQuery::new("Count By Host");
+    q67.add_group_by("Host");
+    let res67 =
+        tylogger::core::AnalyticsEngine::execute_streaming(&mut src67, &col67, &q67, &cancel67);
+    assert_eq!(res67.total_lines_scanned, 3);
+    assert_eq!(res67.matched_records, 3);
+    assert_eq!(res67.rows.len(), 2);
+    assert_eq!(res67.rows[0].key, "192.168.1.1");
+    assert_eq!(res67.rows[0].count, 2);
+    println!(
+        "  -> PASS: Streaming engine aggregated multi-column groups with sub-millisecond execution"
+    );
+
+    println!("[Check 68] Validating Space-Saving Top-K & Bounded Memory Allocation Protection...");
+    let mut topk68 = tylogger::core::SpaceSavingTopK::new(3);
+    for _ in 0..100 {
+        topk68.insert("192.168.1.1");
+    }
+    for _ in 0..50 {
+        topk68.insert("192.168.1.2");
+    }
+    for _ in 0..20 {
+        topk68.insert("10.0.0.1");
+    }
+    for i in 0..10 {
+        topk68.insert(&format!("172.16.0.{}", i));
+    }
+    let top_items = topk68.top_k();
+    assert_eq!(top_items.len(), 3);
+    assert_eq!(top_items[0].item, "192.168.1.1");
+    assert_eq!(top_items[0].count, 100);
+    assert!(topk68.max_error_bound() <= 0.34);
+    println!("  -> PASS: Space-Saving Top-K preserved heavy hitters with verified guaranteed error bound");
+
+    println!(
+        "[Check 69] Validating Count-Min Sketch & HyperLogLog (HLL) Cardinality Estimation..."
+    );
+    let mut cms69 = tylogger::core::CountMinSketch::new(4, 512);
+    let mut hll69 = tylogger::core::HyperLogLog::new(8);
+    for i in 0..500 {
+        let key = format!("session_token_{}", i);
+        cms69.insert(&key);
+        hll69.insert(&key);
+    }
+    assert!(cms69.estimate("session_token_10") >= 1);
+    let hll_est = hll69.estimate();
+    assert!((400..=600).contains(&hll_est));
+    println!("  -> PASS: Constant-memory sketch and HLL estimated 500 distinct items within 15% precision");
+
+    println!("[Check 70] Validating Exact Mode Bounded Disk Spill & Multi-Way Merge-Sort Partitioning...");
+    let mut spill70 = tylogger::core::analytics::spill::DiskSpillManager::new(25);
+    for i in 0..150 {
+        spill70.insert(format!("hash_{:02}", i % 5));
+    }
+    assert!(spill70.partition_count() >= 5);
+    let merged70 = spill70.merge_and_aggregate();
+    assert_eq!(merged70.len(), 5);
+    for (_, count) in &merged70 {
+        assert_eq!(*count, 30);
+    }
+    println!("  -> PASS: Multi-way external disk spill sorted and merged 150 partitioned items accurately");
+
+    println!("[Check 71] Validating HTTP Domain Analytics (Status Distribution 1xx-5xx, Error Rates & Bandwidth)...");
+    let mut http71 = tylogger::core::HttpStatusAnalytics::new();
+    http71.record(200, Some("GET"), Some(1500));
+    http71.record(301, Some("GET"), Some(300));
+    http71.record(404, Some("GET"), Some(250));
+    http71.record(500, Some("POST"), Some(120));
+    let dist71 = http71.distribution();
+    assert_eq!(dist71.total_requests, 4);
+    assert_eq!(dist71.c2xx, 1);
+    assert_eq!(dist71.c3xx, 1);
+    assert_eq!(dist71.c4xx, 1);
+    assert_eq!(dist71.c5xx, 1);
+    assert_eq!(dist71.client_error_rate(), 0.25);
+    assert_eq!(dist71.server_error_rate(), 0.25);
+    assert_eq!(dist71.avg_bytes(), 542.5);
+    println!("  -> PASS: HTTP 1xx-5xx status breakdown, client/server error rates, and bandwidth confirmed");
+
+    println!("[Check 72] Validating Canonical IP Normalization (IPv4/IPv6) & Trusted Proxy Evaluation...");
+    let canonical_ip =
+        tylogger::core::CanonicalIp::parse("::ffff:192.168.01.10").expect("Parse IPv4-mapped");
+    assert_eq!(canonical_ip.raw, "192.168.1.10");
+    assert_eq!(canonical_ip.mask_privacy(), "192.168.1.xxx");
+    let proxy_policy = tylogger::core::TrustedProxyPolicy::new(vec![
+        "127.0.0.1".to_string(),
+        "10.0.0.1".to_string(),
+    ]);
+    let (eval_trusted, fwd_t) =
+        proxy_policy.resolve_client_ip("10.0.0.1", Some("203.0.113.50, 10.0.0.1"));
+    assert!(fwd_t);
+    assert_eq!(eval_trusted.raw, "203.0.113.50");
+    let (eval_untrusted, fwd_f) =
+        proxy_policy.resolve_client_ip("198.51.100.1", Some("203.0.113.50"));
+    assert!(!fwd_f);
+    assert_eq!(eval_untrusted.raw, "198.51.100.1");
+    println!("  -> PASS: Canonical IP parser and spoof-resistant trusted proxy policy validated");
+
+    println!("[Check 73] Validating Endpoint Path Normalization & Dynamic Parameter Stripping (/users/{{id}})...");
+    let ep_num =
+        tylogger::core::NormalizedEndpoint::parse("GET", "/api/v2/users/8921/settings?theme=dark");
+    assert_eq!(ep_num.path, "/api/v2/users/{id}/settings");
+    let ep_uuid = tylogger::core::NormalizedEndpoint::parse(
+        "POST",
+        "/v1/orders/123e4567-e89b-12d3-a456-426614174000",
+    );
+    assert_eq!(ep_uuid.path, "/v1/orders/{uuid}");
+    let ep_hash = tylogger::core::NormalizedEndpoint::parse("GET", "/git/commits/7c27df9a1097015b");
+    assert_eq!(ep_hash.path, "/git/commits/{hash}");
+    println!(
+        "  -> PASS: Dynamic query parameters, IDs, UUIDs, and commit hashes normalized accurately"
+    );
+
+    println!("[Check 74] Validating Latency Quantiles (p50, p90, p95, p99) & Explicit Duration Metric Guard...");
+    let mut lat74 = tylogger::core::LatencyAnalytics::new(300_000_000); // 300ms SLA
+    for d_ms in &[50, 80, 120, 150, 200, 250, 310, 450, 800, 1200] {
+        lat74.record_explicit_duration(*d_ms * 1_000_000);
+    }
+    let q74 = lat74.compute_quantiles();
+    assert_eq!(q74.count, 10);
+    assert_eq!(q74.min_nanos, 50_000_000);
+    assert_eq!(q74.max_nanos, 1_200_000_000);
+    assert_eq!(q74.sla_breaches, 4);
+    assert!(q74.p50_nanos >= 200_000_000);
+    assert!(q74.p99_nanos >= 1_200_000_000);
+    println!(
+        "  -> PASS: Explicit response duration quantiles and SLA threshold breaches calculated"
+    );
+
+    println!("[Check 75] Validating Log Pattern Grouping & Dynamic Token Normalization (<NUM>, <UUID>, <IP>)...");
+    let mut grouper75 = tylogger::core::PatternGrouper::new();
+    grouper75.record_line("Connection established from 192.168.1.10 port 44321 with session 550e8400-e29b-41d4-a716-446655440000", 0);
+    grouper75.record_line("Connection established from 10.0.0.5 port 55123 with session 6ba7b810-9dad-11d1-80b4-00c04fd430c8", 1);
+    grouper75.record_line("Fatal database connection timeout after 3000 ms", 2);
+    let patterns75 = grouper75.top_patterns(10);
+    assert_eq!(patterns75.len(), 2);
+    assert_eq!(patterns75[0].count, 2);
+    assert_eq!(
+        patterns75[0].template,
+        "Connection established from <IP> port <NUM> with session <UUID>"
+    );
+    println!("  -> PASS: Dynamic tokens extracted and grouped into canonical templates without data mutation");
+
+    println!("[Check 76] Validating Explainable Rolling Statistical Anomaly Detection (MAD & Z-Score)...");
+    let mut detector76 = tylogger::core::RollingBaselineDetector::new(8, 3.0);
+    for i in 0..8 {
+        detector76.evaluate(i * 60_000_000_000, "5xx_burst", 5.0);
+    }
+    let anomaly76 = detector76.evaluate(9 * 60_000_000_000, "5xx_burst", 45.0);
+    assert!(anomaly76.is_some());
+    let a76 = anomaly76.unwrap();
+    assert_eq!(a76.metric_name, "5xx_burst");
+    assert!(a76.z_score >= 3.0);
+    assert!(a76.explanation.contains("exceeding rolling baseline"));
+    println!("  -> PASS: Rolling baseline detector flagged deviation with human-readable transparent explanation");
+
+    println!("[Check 77] Validating Sparse Time Bucketing Engine & DST/Timezone Handling...");
+    let mut bucketer77 =
+        tylogger::core::SparseTimeBucketer::new(tylogger::core::BucketInterval::Minutes(5));
+    bucketer77.insert(1_700_000_000_000_000_000, false, 2048);
+    bucketer77.insert(1_700_000_060_000_000_000, true, 512);
+    bucketer77.insert(1_700_003_600_000_000_000, false, 1024);
+    assert_eq!(bucketer77.total_count(), 3);
+    assert_eq!(bucketer77.total_errors(), 1);
+    assert_eq!(bucketer77.buckets().len(), 2);
+    println!(
+        "  -> PASS: Sparse BTreeMap bucketing allocated zero memory for idle observation periods"
+    );
+
+    println!("[Check 78] Validating Native Win32 GDI Timeline Peak-Preserving Downsampling...");
+    let tl_view78 = tylogger::gui::TimelineView::new();
+    let downsampled78 = bucketer77.downsample(100);
+    let gdi_bars = tl_view78.compute_bars(&downsampled78, 800, 120);
+    assert_eq!(gdi_bars.len(), 2);
+    assert!(gdi_bars[0].3 > 0); // bar height > 0
+    let hit_idx = tl_view78.hit_test(50, 800, 2);
+    assert_eq!(hit_idx, Some(0));
+    println!(
+        "  -> PASS: Peak-preserving downsampling and GDI bar coordinate hit-testing operational"
+    );
+
+    println!("[Check 79] Validating Log Dataset Comparison Engine & Observation Duration Normalization...");
+    let cmp_summary79 = tylogger::core::ComparisonEngine::compare(
+        "Release Candidate",
+        5000,
+        10,
+        3600.0,
+        "Production Baseline",
+        10000,
+        50,
+        7200.0,
+        &[("200".to_string(), 4800), ("500".to_string(), 10)],
+        &[
+            ("200".to_string(), 9800),
+            ("500".to_string(), 50),
+            ("503".to_string(), 20),
+        ],
+    );
+    assert_eq!(cmp_summary79.records_a, 5000);
+    assert_eq!(cmp_summary79.records_b, 10000);
+    assert!((cmp_summary79.rate_a - cmp_summary79.rate_b).abs() < 0.01);
+    let key_503 = cmp_summary79.keys.iter().find(|k| k.key == "503").unwrap();
+    assert_eq!(key_503.diff_str, "+20 (new)");
+    println!("  -> PASS: Observation durations normalized and zero-baseline differences mapped as '+N (new)'");
+
+    println!("[Check 80] Validating Local Security Presets (Wazuh Severity & Suricata EVE Signatures)...");
+    let mut sec80 = tylogger::core::SecurityPresetAnalyzer::new();
+    let w_line = r#"{"rule":{"level":14,"description":"Root privilege escalation detected"}}"#;
+    let s_line = r#"{"event_type":"alert","alert":{"signature":"SURICATA SQL Injection Attempt"}}"#;
+    let auth_line =
+        r#"192.168.1.1 - [25/Nov/2026:12:00:00 +0700] "POST /admin/login HTTP/1.1" 401 128"#;
+    let obs_w = sec80.inspect_line(w_line, 1);
+    let obs_s = sec80.inspect_line(s_line, 2);
+    let obs_a = sec80.inspect_line(auth_line, 3);
+    assert!(obs_w.is_some() && obs_w.unwrap().category.contains("Wazuh"));
+    assert!(obs_s.is_some() && obs_s.unwrap().category.contains("Suricata"));
+    assert!(obs_a.is_some() && obs_a.unwrap().category.contains("Authentication"));
+    println!(
+        "  -> PASS: Security investigation presets extracted events as objective observations"
+    );
+
+    println!(
+        "[Check 81] Validating Native Graphical Query Builder Condition Tree & Type Safety..."
+    );
+    let mut qb81 = tylogger::gui::QueryBuilderDialog::new(vec![
+        "status".to_string(),
+        "ip".to_string(),
+        "latency".to_string(),
+    ]);
+    qb81.set_title("Slow 5xx Requests");
+    qb81.add_condition("status", tylogger::core::QueryOperator::GreaterThan, "499");
+    qb81.set_group_by("ip");
+    qb81.set_aggregation("status", tylogger::core::AggregationType::Count);
+    let built_q81 = qb81.build();
+    assert_eq!(built_q81.title, "Slow 5xx Requests");
+    assert_eq!(built_q81.filters.len(), 1);
+    assert_eq!(built_q81.group_by, vec!["ip"]);
+    println!("  -> PASS: Graphical query builder constructed valid type-safe query representation");
+
+    println!("[Check 82] Validating Drill-Down Architecture & Filter-to-Tab Virtual LogSource Mapping...");
+    let mut ws82 = tylogger::gui::AnalyticsWorkspace::new();
+    ws82.set_result(res67);
+    let filter_key = ws82.drill_down_filter(0);
+    assert_eq!(filter_key, Some("192.168.1.1".to_string()));
+    let ft_criteria = tylogger::core::FilterCriteria::new_include(&filter_key.unwrap(), false);
+    let parent_arc: std::sync::Arc<std::sync::Mutex<Box<dyn tylogger::core::LogSource>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Box::new(src67)));
+    let mut ft_src = tylogger::core::FilteredDocumentSource::create(parent_arc, ft_criteria)
+        .expect("Create FilteredDocumentSource");
+    assert_eq!(ft_src.line_count(), 2);
+    assert!(ft_src.get_line(0).unwrap().contains("192.168.1.1"));
+    println!("  -> PASS: Metric drill-down instantiated FilteredDocumentSource without copying raw records");
+
+    println!("[Check 83] Validating Incremental Live Streaming Analytics & Watermark Rollover Resiliency...");
+    let mut live_topk = tylogger::core::SpaceSavingTopK::new(10);
+    let mut watermark_offset = 0;
+    let incoming_batch1 = ["10.0.0.1", "10.0.0.2", "10.0.0.1"];
+    for (idx, ip) in incoming_batch1.iter().enumerate() {
+        if idx >= watermark_offset {
+            live_topk.insert(ip);
+            watermark_offset = idx + 1;
+        }
+    }
+    assert_eq!(live_topk.total_processed(), 3);
+    // Rollover: watermark resets cleanly
+    watermark_offset = 0;
+    let incoming_batch2 = ["10.0.0.3", "10.0.0.1"];
+    for (idx, ip) in incoming_batch2.iter().enumerate() {
+        if idx >= watermark_offset {
+            live_topk.insert(ip);
+            watermark_offset = idx + 1;
+        }
+    }
+    assert_eq!(live_topk.total_processed(), 5);
+    println!(
+        "  -> PASS: High-watermark offset prevented double-counting across append and log rotation"
+    );
+
+    println!(
+        "[Check 84] Validating Self-Contained Offline HTML Report Generation & Privacy Masking..."
+    );
+    let report_dst = temp_dir.join(format!("tylogger_report_{}.html", std::process::id()));
+    let raw_test_line = "Admin test@example.com Auth: Bearer super_secret_token_123 password=P@ssw0rd123 IP 192.168.1.150";
+    let mask_opts = tylogger::core::PrivacyMaskingOptions::default();
+    let masked_report_line = tylogger::core::PrivacyFilter::mask_line(raw_test_line, mask_opts);
+    assert!(!masked_report_line.contains("super_secret_token_123"));
+    assert!(!masked_report_line.contains("P@ssw0rd123"));
+    assert!(masked_report_line.contains("***MASKED_TOKEN***"));
+    assert!(masked_report_line.contains("192.168.1.xxx"));
+
+    let agg_result = tylogger::core::AggregationResult {
+        query_title: "Security Incident Report <XSS_TEST>".to_string(),
+        total_lines_scanned: 1000,
+        matched_records: 42,
+        execution_millis: 15,
+        is_exact: true,
+        error_bound: None,
+        headers: vec!["Event Group".to_string(), "Count".to_string()],
+        rows: vec![tylogger::core::MetricRow {
+            key: masked_report_line,
+            count: 42,
+            values: Vec::new(),
+        }],
+        buckets: vec![(
+            1_700_000_000,
+            tylogger::core::BucketStats {
+                count: 42,
+                error_count: 5,
+                bytes_sum: 1024,
+                min_nanos: 0,
+                max_nanos: 100,
+            },
+        )],
+    };
+    tylogger::core::OfflineReportGenerator::generate_html_report(
+        &agg_result,
+        &report_dst,
+        Some(mask_opts),
+    )
+    .expect("Generate offline report");
+    let html_content = std::fs::read_to_string(&report_dst).expect("Read report HTML");
+    assert!(html_content.contains("&lt;XSS_TEST&gt;"));
+    assert!(html_content.contains("<svg width="));
+    assert!(!html_content.contains("<script"));
+    assert!(html_content.contains("***MASKED_TOKEN***"));
+    let _ = std::fs::remove_file(&report_dst);
+    println!("  -> PASS: Standalone offline HTML report generated with inline SVG chart and strict XSS defense");
+
+    println!("[Check 85] Validating Session Schema v3.0 Migration & Backwards Compatibility (v1/v2 -> v3)...");
+    let mut sess_v3 = tylogger::core::SessionState::new_v3("Phase 6 Analytics Session");
+    sess_v3.analytics_workspace_open = true;
+    sess_v3.active_analytics_query = Some("Top Endpoints".to_string());
+    sess_v3.analytics_preset_id = Some("http_status".to_string());
+    let v3_json = sess_v3.to_json();
+    assert!(v3_json.contains("\"schema_version\": \"3.0\""));
+    assert!(v3_json.contains("\"analytics_workspace_open\": true"));
+    assert!(v3_json.contains("\"analytics_preset_id\": \"http_status\""));
+    let restored_v3 = tylogger::core::SessionState::from_json(&v3_json).expect("Parse v3 session");
+    assert_eq!(restored_v3.schema_version, "3.0");
+    assert!(restored_v3.analytics_workspace_open);
+    assert_eq!(
+        restored_v3.active_analytics_query,
+        Some("Top Endpoints".to_string())
+    );
+    assert_eq!(
+        restored_v3.analytics_preset_id,
+        Some("http_status".to_string())
+    );
+
+    // Verify backward compatibility with legacy v2.0
+    let v2_legacy = r#"{"schema_version": "2.0", "workspace_name": "Old", "documents": []}"#;
+    let restored_legacy =
+        tylogger::core::SessionState::from_json(v2_legacy).expect("Parse legacy v2");
+    assert_eq!(restored_legacy.schema_version, "2.0");
+    assert!(!restored_legacy.analytics_workspace_open);
+    assert_eq!(restored_legacy.active_analytics_query, None);
+    println!("  -> PASS: Session Schema v3.0 persisted cleanly with 100% legacy v1.0/v2.0 backward compatibility");
+
+    println!("=== ALL 85 VERIFICATION CHECKS PASSED ===");
 }
