@@ -863,4 +863,61 @@ mod tests {
         // Cleanup
         let _ = std::fs::remove_file(&test_file);
     }
+
+    #[test]
+    fn test_extreme_records_and_nul_bytes() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!("tylogger_extreme_{}.log", std::process::id()));
+
+        // Write file with embedded NUL byte, malformed JSON, missing trailing newline
+        {
+            use std::io::Write;
+            let mut f = std::fs::File::create(&test_file).unwrap();
+            f.write_all(b"Normal Line 1\n").unwrap();
+            f.write_all(b"Embedded\0Nul\0Bytes\n").unwrap();
+            f.write_all(b"\n\n").unwrap(); // Empty lines
+            f.write_all(b"Malformed JSON: {\"key\": unquoted_value\n").unwrap();
+            f.write_all(b"EOF Line Without Newline").unwrap(); // No trailing \n
+        }
+
+        let mut reader = NonLockingLogReader::open(&test_file).expect("Open extreme reader");
+        assert_eq!(reader.line_count(), 6);
+
+        assert_eq!(reader.get_line(0).unwrap(), "Normal Line 1");
+        let nul_line = reader.get_line(1).unwrap();
+        assert!(nul_line.contains("Embedded\0Nul\0Bytes"));
+        assert_eq!(reader.get_line(2).unwrap(), "");
+        assert_eq!(reader.get_line(3).unwrap(), "");
+        assert!(reader.get_line(4).unwrap().contains("Malformed JSON"));
+        assert_eq!(reader.get_line(5).unwrap(), "EOF Line Without Newline");
+
+        let _ = std::fs::remove_file(&test_file);
+    }
+
+    #[test]
+    fn test_oversized_line_truncation_safety() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!("tylogger_oversized_{}.log", std::process::id()));
+
+        // Write 1.5 MB single line
+        {
+            use std::io::Write;
+            let mut f = std::fs::File::create(&test_file).unwrap();
+            let huge_payload = vec![b'X'; 1500 * 1024];
+            f.write_all(&huge_payload).unwrap();
+            f.write_all(b"\nSmall line after huge\n").unwrap();
+        }
+
+        let mut reader = NonLockingLogReader::open(&test_file).expect("Open reader");
+        assert_eq!(reader.line_count(), 2);
+
+        let huge_line = reader.get_line(0).expect("Read huge line");
+        assert!(huge_line.ends_with("[Truncated]"));
+        assert!(huge_line.len() <= MAX_LINE_DISPLAY_BYTES + 50);
+
+        let second_line = reader.get_line(1).expect("Read second line");
+        assert_eq!(second_line, "Small line after huge");
+
+        let _ = std::fs::remove_file(&test_file);
+    }
 }
