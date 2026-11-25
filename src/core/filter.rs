@@ -450,7 +450,10 @@ mod tests {
 
         mgr.add_preset(preset);
         assert_eq!(mgr.presets.len(), 1);
-        assert_eq!(mgr.get_preset("CriticalErrors").unwrap().pattern, "CRITICAL");
+        assert_eq!(
+            mgr.get_preset("CriticalErrors").unwrap().pattern,
+            "CRITICAL"
+        );
 
         // History management
         mgr.record_history("query 1");

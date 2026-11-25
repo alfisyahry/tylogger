@@ -10,6 +10,7 @@ pub mod multifile;
 pub mod multiline;
 pub mod reader;
 pub mod search;
+pub mod session;
 pub mod source;
 pub mod workspace;
 
@@ -27,5 +28,6 @@ pub use multifile::MultiFileSource;
 pub use multiline::{LogicalRecord, MultilineEngine};
 pub use reader::{NonLockingLogReader, UpdateEvent};
 pub use search::{SearchEngine, SearchOptions, SearchResult};
+pub use session::{CrashRecoveryTracker, MissingSourceAction, SessionDocument, SessionState};
 pub use source::{allocate_source_id, LogSource, MockSource, SingleFileSource, SourceLineRef};
 pub use workspace::{Document, Workspace};
