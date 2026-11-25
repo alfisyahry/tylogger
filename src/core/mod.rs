@@ -3,6 +3,7 @@ pub mod anomaly;
 pub mod archive;
 pub mod bookmark;
 pub mod columnizer;
+pub mod compat;
 pub mod compare;
 pub mod correlation;
 pub mod custom_columnizer;
@@ -94,6 +95,7 @@ pub use trigger::{
     ActionHistoryEntry, BoundedActionHistory, BoundedActionQueue, GlobalTriggerDeduplicator,
     KeywordTriggerRule, QueuedAction, TriggerAction, TriggerEngine, TriggerExecutionKey,
 };
+pub use compat::{fill_secure_random, verify_delay_load_runtime_safety, Win32SyncEvent};
 pub use workspace::{Document, Workspace};
 
 pub use archive::{
