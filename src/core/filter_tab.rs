@@ -41,9 +41,7 @@ impl FilteredDocumentSource {
         let filtered_indices = FilterEngine::apply_filter(
             total_parent_lines,
             |idx| {
-                if chunk_buf.is_empty()
-                    || idx < chunk_start
-                    || idx >= chunk_start + chunk_buf.len()
+                if chunk_buf.is_empty() || idx < chunk_start || idx >= chunk_start + chunk_buf.len()
                 {
                     chunk_start = idx;
                     let count = (total_parent_lines - idx).min(CHUNK_SIZE);
@@ -77,11 +75,7 @@ impl FilteredDocumentSource {
 
     /// Appends newly matched lines when parent source live tail receives appends.
     /// Employs chunked reads to avoid long mutex lock retention.
-    pub fn update_with_parent_appends(
-        &mut self,
-        start_parent_idx: usize,
-        new_parent_lines: usize,
-    ) {
+    pub fn update_with_parent_appends(&mut self, start_parent_idx: usize, new_parent_lines: usize) {
         const CHUNK_SIZE: usize = 1024;
         let end_parent_idx = start_parent_idx + new_parent_lines;
         let mut curr_idx = start_parent_idx;

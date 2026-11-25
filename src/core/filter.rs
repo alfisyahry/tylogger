@@ -39,11 +39,7 @@ impl FilterCriteria {
         Self {
             pattern: pattern.to_string(),
             mode: FilterMode::Include,
-            options: SearchOptions {
-                case_sensitive,
-                whole_word: false,
-                is_regex: false,
-            },
+            options: SearchOptions::new_plain(case_sensitive, false),
             range_start: None,
             range_end: None,
             back_spread: 0,
@@ -57,11 +53,7 @@ impl FilterCriteria {
         Self {
             pattern: pattern.to_string(),
             mode: FilterMode::Exclude,
-            options: SearchOptions {
-                case_sensitive,
-                whole_word: false,
-                is_regex: false,
-            },
+            options: SearchOptions::new_plain(case_sensitive, false),
             range_start: None,
             range_end: None,
             back_spread: 0,

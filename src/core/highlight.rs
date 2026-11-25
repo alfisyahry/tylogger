@@ -55,10 +55,10 @@ impl HighlightRule {
             line
         };
 
-        let opts = SearchOptions {
-            case_sensitive: self.case_sensitive,
-            whole_word: self.whole_word,
-            is_regex: self.is_regex,
+        let opts = if self.is_regex {
+            SearchOptions::new_regex(self.case_sensitive)
+        } else {
+            SearchOptions::new_plain(self.case_sensitive, self.whole_word)
         };
 
         SearchEngine::matches_line(target_str, &self.pattern, &opts)
