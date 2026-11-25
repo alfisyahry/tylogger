@@ -51,6 +51,13 @@ pub const ID_ANALYTICS_COMPARE_LOGS: u16 = 1082;
 pub const ID_ANALYTICS_EXPORT_REPORT: u16 = 1083;
 pub const ID_ANALYTICS_TIMELINE_TOGGLE: u16 = 1084;
 
+// Phase 7: Remote, Streams, Archives & Legacy Commands
+pub const ID_REMOTE_CONNECT: u16 = 2401;
+pub const ID_REMOTE_BROWSE: u16 = 2402;
+pub const ID_STREAM_OPEN: u16 = 2403;
+pub const ID_ARCHIVE_OPEN: u16 = 2404;
+pub const ID_LEGACY_IMPORT: u16 = 2405;
+
 pub const ID_HELP_ABOUT: u16 = 1060;
 
 // Context Menu IDs for Tabs

@@ -5,6 +5,7 @@ pub mod grid;
 pub mod markerbar;
 pub mod menu;
 pub mod panels;
+pub mod remote_dialogs;
 pub mod searchbar;
 pub mod statusbar;
 pub mod tabstrip;

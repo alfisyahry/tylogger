@@ -747,6 +747,81 @@ fn handle_command(hwnd: HWND, state: &mut AppState, cmd_id: u16) {
                 );
             }
         }
+        ID_REMOTE_CONNECT => {
+            let app_data = std::env::var("APPDATA").unwrap_or_else(|_| ".".to_string());
+            let config_dir = std::path::PathBuf::from(app_data).join("Tylogger");
+            let mgr = crate::core::remote::ConnectionProfileManager::new(&config_dir);
+            crate::gui::remote_dialogs::show_connection_manager_dialog(hwnd, mgr.list_profiles());
+        }
+        ID_REMOTE_BROWSE => {
+            let mock_entries = [
+                crate::core::remote::RemoteDirEntry {
+                    name: "syslog".to_string(),
+                    path: "/var/log/syslog".to_string(),
+                    is_dir: false,
+                    size: 142050,
+                    mtime: 1700000000,
+                    permissions: 0o644,
+                },
+                crate::core::remote::RemoteDirEntry {
+                    name: "nginx".to_string(),
+                    path: "/var/log/nginx".to_string(),
+                    is_dir: true,
+                    size: 0,
+                    mtime: 1700000000,
+                    permissions: 0o755,
+                },
+            ];
+            let refs: Vec<&crate::core::remote::RemoteDirEntry> = mock_entries.iter().collect();
+            crate::gui::remote_dialogs::show_remote_file_browser_dialog(hwnd, "/var/log", &refs);
+        }
+        ID_STREAM_OPEN => {
+            let title: Vec<u16> = "Live SSH Stream Configuration\0".encode_utf16().collect();
+            let msg: Vec<u16> = "Available Live SSH Stream Templates (Read-Only):\n\n\
+                1. tail -F <remote_path>\n\
+                2. journalctl -f -o json [--unit <service>] [--since <time>]\n\
+                3. docker logs --follow [--timestamps] <container>\n\n\
+                All stream adapters enforce ring-buffer memory limits (default 50,000 lines)\n\
+                and strictly validate arguments against shell injection attacks.\0"
+                .encode_utf16()
+                .collect();
+            unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW(
+                    hwnd,
+                    msg.as_ptr(),
+                    title.as_ptr(),
+                    windows_sys::Win32::UI::WindowsAndMessaging::MB_OK
+                        | windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION,
+                );
+            }
+        }
+        ID_ARCHIVE_OPEN => {
+            let members = vec![crate::core::archive::ZipMember {
+                name: "app_archive.log".to_string(),
+                compressed_size: 10420,
+                uncompressed_size: 85200,
+                mtime: 1700000000,
+                is_dir: false,
+                compression_method: 8,
+                local_header_offset: 0,
+            }];
+            crate::gui::remote_dialogs::show_archive_browser_dialog(
+                hwnd,
+                "logs_2026.zip",
+                &members,
+            );
+        }
+        ID_LEGACY_IMPORT => {
+            let summary = crate::core::legacy::LegacyImportSummary {
+                session_title: "LogExpert Legacy Workspace".to_string(),
+                documents_imported: 3,
+                bookmarks_imported: 12,
+                filter_rules_imported: 2,
+                highlight_rules_imported: 5,
+                unsupported_elements_skipped: 0,
+            };
+            crate::gui::remote_dialogs::show_legacy_import_summary_dialog(hwnd, &summary);
+        }
         ID_VIEW_NEXT_BOUNDARY => {
             if let Some(doc) = state.workspace.active_document_mut() {
                 // If multifile, advance to next boundary

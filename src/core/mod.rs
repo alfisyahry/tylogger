@@ -1,5 +1,6 @@
 pub mod analytics;
 pub mod anomaly;
+pub mod archive;
 pub mod bookmark;
 pub mod columnizer;
 pub mod compare;
@@ -11,6 +12,7 @@ pub mod filter;
 pub mod filter_tab;
 pub mod highlight;
 pub mod inspector;
+pub mod legacy;
 pub mod memory;
 pub mod merge;
 pub mod multifile;
@@ -18,10 +20,12 @@ pub mod multiline;
 pub mod pattern;
 pub mod plugin;
 pub mod reader;
+pub mod remote;
 pub mod search;
 pub mod session;
 pub mod source;
 pub mod stats;
+pub mod stream;
 pub mod sync;
 pub mod time;
 pub mod tools;
@@ -91,3 +95,26 @@ pub use trigger::{
     KeywordTriggerRule, QueuedAction, TriggerAction, TriggerEngine, TriggerExecutionKey,
 };
 pub use workspace::{Document, Workspace};
+
+pub use archive::{
+    decompress_gzip, inflate_deflate, validate_safe_zip_entry_path, GzipLogReader, TempFileGuard,
+    ZipArchiveReader, ZipMember,
+};
+pub use legacy::{
+    LegacyExternalToolDef, LegacyFilterPreset, LegacyHighlightRule, LegacyImportSummary,
+    LegacySessionImporter, SettingsMigrationWizard,
+};
+pub use plugin::{DataSourceIpcMessage, MockDataSourcePlugin};
+pub use remote::{
+    calculate_backoff_delay, protect_secret_dpapi, unprotect_secret_dpapi, zero_memory, AuthMethod,
+    BoundedConnectionPool, CancellationToken, ConnectionProfile, ConnectionProfileManager,
+    ConnectionState, CredentialStore, HostKeySetting, HostKeyVerificationResult, KnownHostEntry,
+    KnownHostsStore, MockRemoteTransport, ReconnectPolicy, RemoteDirEntry, RemoteFileStat,
+    RemoteMultiFileScanner, RemoteRotatedFile, RemoteRotationType, RemoteTransport,
+    SftpFileBrowser, SftpLiveTailEngine, SftpLogReader, SortColumn,
+};
+pub use source::{SourceCapabilities, SourceIdentity, SourceStatus, SourceType};
+pub use stream::{
+    validate_safe_argument, BoundedStreamStorage, DockerLogParser, DockerStreamRecord,
+    DockerStreamType, JournaldJsonParser, JournaldRecord, StreamTemplate,
+};

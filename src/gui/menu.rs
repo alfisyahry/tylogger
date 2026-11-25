@@ -48,6 +48,37 @@ pub fn create_main_menu() -> HMENU {
         AppendMenuW(
             file_menu,
             MF_STRING,
+            ID_REMOTE_CONNECT as usize,
+            to_wide("&Connect to Remote Server...\tCtrl+Shift+R").as_ptr(),
+        );
+        AppendMenuW(
+            file_menu,
+            MF_STRING,
+            ID_REMOTE_BROWSE as usize,
+            to_wide("&Browse Remote Files...\tCtrl+Shift+B").as_ptr(),
+        );
+        AppendMenuW(
+            file_menu,
+            MF_STRING,
+            ID_STREAM_OPEN as usize,
+            to_wide("Open Live &SSH Stream...\tCtrl+Shift+S").as_ptr(),
+        );
+        AppendMenuW(
+            file_menu,
+            MF_STRING,
+            ID_ARCHIVE_OPEN as usize,
+            to_wide("Open Compressed &Archive...\tCtrl+Shift+Z").as_ptr(),
+        );
+        AppendMenuW(
+            file_menu,
+            MF_STRING,
+            ID_LEGACY_IMPORT as usize,
+            to_wide("&Import Legacy LogExpert Session...\tCtrl+Shift+I").as_ptr(),
+        );
+        AppendMenuW(file_menu, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(
+            file_menu,
+            MF_STRING,
             ID_FILE_CLOSE as usize,
             to_wide("&Close Document\tCtrl+W").as_ptr(),
         );

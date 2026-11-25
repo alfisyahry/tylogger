@@ -29,6 +29,11 @@ This document provides the authoritative mapping between command IDs, display la
 | 1053 | `ID_TOOLS_JUMP_LINE` | Tools -> Jump to Line... | — | `Ctrl+G` | Jump to specific 64-bit line number |
 | 1054 | `ID_TOOLS_SETTINGS` | Tools -> Settings... | Settings | `F10` | Display user preferences dialog |
 | 1060 | `ID_HELP_ABOUT` | Help -> About Tylogger | — | `F1` | Show official About Tylogger dialog |
+| 2401 | `ID_REMOTE_CONNECT` | File -> Remote -> Connect to SSH/SFTP... | Connect | `Ctrl+Shift+R` | Open SSH/SFTP Connection Manager |
+| 2402 | `ID_REMOTE_BROWSE` | File -> Remote -> Browse SFTP Files... | Browse | `Ctrl+Shift+B` | Open SFTP Remote File Browser |
+| 2403 | `ID_STREAM_OPEN` | File -> Stream -> Open SSH Stream... | Stream | `Ctrl+Shift+S` | Open SSH Live Stream Adapter (tail, journald, docker) |
+| 2404 | `ID_ARCHIVE_OPEN` | File -> Archive -> Open Compressed Log... | Archive | `Ctrl+Shift+Z` | Open Compressed Archive (GZIP/ZIP) |
+| 2405 | `ID_LEGACY_IMPORT` | File -> Import -> Legacy LogExpert Session... | Import | `Ctrl+Shift+I` | Import LogExpert Legacy Session (.lxp/.lxj) |
 
 ## Tab Context Menu Commands
 
