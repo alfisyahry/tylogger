@@ -385,6 +385,7 @@ unsafe extern "system" fn wnd_proc(
                 LogGrid::draw(
                     mem_dc,
                     grid_width,
+                    curr_y,
                     grid_height,
                     state.workspace.active_document_mut(),
                     theme,

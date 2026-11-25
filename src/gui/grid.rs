@@ -123,10 +123,11 @@ impl LogGrid {
         }
     }
 
-    /// Renders visible rows of the virtual log grid using double-buffered GDI.
+    /// Renders visible rows of the virtual log grid using double-buffered GDI and reusable GDI brush caching.
     pub unsafe fn draw(
         hdc: HDC,
         width: i32,
+        top_y: i32,
         height: i32,
         doc: Option<&mut Document>,
         theme: &ThemeTokens,
@@ -134,13 +135,17 @@ impl LogGrid {
         row_height: i32,
         char_width: i32,
     ) {
+        if height <= 0 || width <= 0 {
+            return;
+        }
+
         // Base viewport background
         let bg_brush = CreateSolidBrush(theme.row_bg.to_colorref());
         let full_rect = RECT {
             left: 0,
-            top: 0,
+            top: top_y,
             right: width,
-            bottom: height,
+            bottom: top_y + height,
         };
         FillRect(hdc, &full_rect, bg_brush);
         DeleteObject(bg_brush as _);
@@ -156,7 +161,7 @@ impl LogGrid {
                     "No log file open. Use File -> Open (Ctrl+O) or Drag & Drop a file here.\0"
                         .encode_utf16()
                         .collect();
-                TextOutW(hdc, 24, 24, msg.as_ptr(), (msg.len() - 1) as _);
+                TextOutW(hdc, 24, top_y + 24, msg.as_ptr(), (msg.len() - 1) as _);
                 SelectObject(hdc, old_font);
                 return;
             }
@@ -168,7 +173,7 @@ impl LogGrid {
             SetBkMode(hdc, TRANSPARENT as _);
             SetTextColor(hdc, theme.text_muted.to_colorref());
             let msg: Vec<u16> = "Log file is empty (0 lines).\0".encode_utf16().collect();
-            TextOutW(hdc, 24, 24, msg.as_ptr(), (msg.len() - 1) as _);
+            TextOutW(hdc, 24, top_y + 24, msg.as_ptr(), (msg.len() - 1) as _);
             SelectObject(hdc, old_font);
             return;
         }
@@ -182,9 +187,9 @@ impl LogGrid {
         let gutter_brush = CreateSolidBrush(theme.row_gutter.to_colorref());
         let gutter_rect = RECT {
             left: 0,
-            top: 0,
+            top: top_y,
             right: gutter_width,
-            bottom: height,
+            bottom: top_y + height,
         };
         FillRect(hdc, &gutter_rect, gutter_brush);
         DeleteObject(gutter_brush as _);
@@ -193,15 +198,22 @@ impl LogGrid {
         let border_brush = CreateSolidBrush(theme.border_subtle.to_colorref());
         let border_rect = RECT {
             left: gutter_width - 1,
-            top: 0,
+            top: top_y,
             right: gutter_width,
-            bottom: height,
+            bottom: top_y + height,
         };
         FillRect(hdc, &border_rect, border_brush);
         DeleteObject(border_brush as _);
 
         let old_font = SelectObject(hdc, font);
         SetBkMode(hdc, TRANSPARENT as _);
+
+        // Allocate reusable brushes upfront to avoid GDI handle churn / leaks during row iteration (AG-15, RSK-21)
+        let normal_brush = CreateSolidBrush(theme.row_bg.to_colorref());
+        let alt_brush = CreateSolidBrush(theme.row_alternate.to_colorref());
+        let sel_brush = CreateSolidBrush(theme.selection_bg.to_colorref());
+        let bm_brush = CreateSolidBrush(theme.accent_primary.to_colorref());
+        let match_brush = CreateSolidBrush(theme.search_match_bg.to_colorref());
 
         // Render visible rows
         for i in 0..visible_count {
@@ -210,11 +222,11 @@ impl LogGrid {
                 break;
             }
 
-            let y_pos = (i as i32) * row_height;
+            let y_pos = top_y + (i as i32) * row_height;
             let is_selected = line_idx == selected_line;
             let is_bookmarked = doc.is_bookmarked(line_idx);
 
-            // Row background
+            // Row background using reusable cached brush
             let row_rect = RECT {
                 left: gutter_width,
                 top: y_pos,
@@ -222,21 +234,17 @@ impl LogGrid {
                 bottom: y_pos + row_height,
             };
 
-            let row_bg = if is_selected {
-                theme.selection_bg.to_colorref()
+            let r_brush = if is_selected {
+                sel_brush
             } else if line_idx % 2 == 1 {
-                theme.row_alternate.to_colorref()
+                alt_brush
             } else {
-                theme.row_bg.to_colorref()
+                normal_brush
             };
-
-            let r_brush = CreateSolidBrush(row_bg);
             FillRect(hdc, &row_rect, r_brush);
-            DeleteObject(r_brush as _);
 
-            // Bookmark icon / glyph in gutter
+            // Bookmark icon / glyph in gutter using cached bm_brush
             if is_bookmarked {
-                let bm_brush = CreateSolidBrush(theme.accent_primary.to_colorref());
                 let bm_rect = RECT {
                     left: 6,
                     top: y_pos + 4,
@@ -244,7 +252,6 @@ impl LogGrid {
                     bottom: y_pos + row_height - 4,
                 };
                 FillRect(hdc, &bm_rect, bm_brush);
-                DeleteObject(bm_brush as _);
             }
 
             // Line number in gutter
@@ -293,9 +300,7 @@ impl LogGrid {
                                 right: match_x + match_w,
                                 bottom: y_pos + row_height - 1,
                             };
-                            let m_brush = CreateSolidBrush(theme.search_match_bg.to_colorref());
-                            FillRect(hdc, &match_rect, m_brush);
-                            DeleteObject(m_brush as _);
+                            FillRect(hdc, &match_rect, match_brush);
 
                             // Redraw matched text in match color
                             SetTextColor(hdc, theme.search_match_fg.to_colorref());
@@ -316,6 +321,13 @@ impl LogGrid {
         }
 
         SelectObject(hdc, old_font);
+
+        // Deterministic cleanup of reusable GDI brushes
+        DeleteObject(normal_brush as _);
+        DeleteObject(alt_brush as _);
+        DeleteObject(sel_brush as _);
+        DeleteObject(bm_brush as _);
+        DeleteObject(match_brush as _);
     }
 }
 
