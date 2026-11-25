@@ -1,2 +1,7 @@
-[target.'cfg(all(windows, target_env = "msvc"))']
-rustflags = ["-C", "target-feature=+crt-static"]
+[build]
+rustflags = [
+    "-C", "target-feature=+crt-static",
+    "-C", "link-arg=/DELAYLOAD:api-ms-win-core-synch-l1-2-0.dll",
+    "-C", "link-arg=/DELAYLOAD:bcryptprimitives.dll",
+    "-C", "link-arg=delayimp.lib",
+]
