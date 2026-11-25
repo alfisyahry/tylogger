@@ -598,21 +598,15 @@ fn run_headless_verification() {
         max_step_budget: 10_000,
     };
     assert!(tylogger::core::SearchEngine::matches_line(
-        ext_line,
-        ext_pat,
-        &opt_ext
+        ext_line, ext_pat, &opt_ext
     ));
     println!("  -> PASS: Extended regex lookahead and lookbehind matched pattern accurately");
 
     println!("[Check 33] Validating ReDoS Catastrophic Backtracking & Step Budget Protection...");
     let redos_input = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaab";
     let redos_pat = r"(a+)+$";
-    let redos_res = tylogger::core::SearchEngine::matches_regex_extended(
-        redos_input,
-        redos_pat,
-        true,
-        1_000,
-    );
+    let redos_res =
+        tylogger::core::SearchEngine::matches_regex_extended(redos_input, redos_pat, true, 1_000);
     assert!(redos_res.is_err());
     let redos_err = redos_res.unwrap_err();
     assert!(redos_err.contains("ReDoS") || redos_err.contains("timeout"));
@@ -621,10 +615,10 @@ fn run_headless_verification() {
     println!("[Check 34] Validating Damerau-Levenshtein 4-Operation Fuzzy Matching (Adjacent Transposition)...");
     let s_orig: Vec<char> = "ConnectionException".chars().collect();
     let s_trans: Vec<char> = "ConnecitonException".chars().collect(); // ti -> it
-    let s_sub: Vec<char> = "ConnectionExcepsion".chars().collect();   // t -> s
-    let s_del: Vec<char> = "ConnctionException".chars().collect();    // -e
-    let s_ins: Vec<char> = "ConnectionnException".chars().collect();  // +n
-    let s_two: Vec<char> = "ConetionException".chars().collect();     // -n, -c (2 edits)
+    let s_sub: Vec<char> = "ConnectionExcepsion".chars().collect(); // t -> s
+    let s_del: Vec<char> = "ConnctionException".chars().collect(); // -e
+    let s_ins: Vec<char> = "ConnectionnException".chars().collect(); // +n
+    let s_two: Vec<char> = "ConetionException".chars().collect(); // -n, -c (2 edits)
 
     assert_eq!(
         tylogger::core::search::DamerauLevenshtein::distance(&s_orig, &s_trans),
@@ -661,7 +655,9 @@ fn run_headless_verification() {
         "ConnectionException",
         &opt_f1
     ));
-    println!("  -> PASS: Transposition counted as 1 edit; fuzzy line search matched within threshold");
+    println!(
+        "  -> PASS: Transposition counted as 1 edit; fuzzy line search matched within threshold"
+    );
 
     println!("[Check 35] Validating Persistent Filter Presets Management & Serialization...");
     let mut f_mgr = tylogger::core::FilterPresetManager::new();
@@ -680,7 +676,9 @@ fn run_headless_verification() {
     assert_eq!(f_mgr.recent_history.len(), 2);
     f_mgr.clear_history();
     assert_eq!(f_mgr.recent_history.len(), 0);
-    println!("  -> PASS: Recent filter history recorded with deduplication and cleared permanently");
+    println!(
+        "  -> PASS: Recent filter history recorded with deduplication and cleared permanently"
+    );
 
     println!("[Check 37] Validating Versioned Native Session (.tysession v1) Format...");
     let mut sess = tylogger::core::SessionState::new("Production Incident");
@@ -703,8 +701,7 @@ fn run_headless_verification() {
     });
     let sess_json = sess.to_json();
     assert!(sess_json.contains("\"schema_version\": \"1.0\""));
-    let sess_restored =
-        tylogger::core::SessionState::from_json(&sess_json).expect("Parse session");
+    let sess_restored = tylogger::core::SessionState::from_json(&sess_json).expect("Parse session");
     assert_eq!(sess_restored.workspace_name, "Production Incident");
     assert_eq!(sess_restored.documents[0].bookmarks, vec![10, 25]);
     println!("  -> PASS: Version 1.0 session JSON serialized and restored accurately");
@@ -730,14 +727,17 @@ fn run_headless_verification() {
     let ordered_docs = sess.dependency_ordered_documents();
     assert_eq!(ordered_docs[0].id, 1); // Parent
     assert_eq!(ordered_docs[1].id, 2); // Child filtered tab
-    println!("  -> PASS: Parent log documents ordered before child filtered tabs for safe restoration");
+    println!(
+        "  -> PASS: Parent log documents ordered before child filtered tabs for safe restoration"
+    );
 
     println!("[Check 39] Validating Atomic Session Persistence & Last-Known-Good Backup (.bak)...");
     let sess_test_path = temp_dir.join(format!(
         "tylogger_headless_sess_{}.tysession",
         std::process::id()
     ));
-    sess.save_atomic(&sess_test_path).expect("Save session atomic");
+    sess.save_atomic(&sess_test_path)
+        .expect("Save session atomic");
     assert!(sess_test_path.exists());
     sess.workspace_name = "Mutated Session".to_string();
     sess.save_atomic(&sess_test_path).expect("Resave session");
@@ -785,14 +785,15 @@ fn run_headless_verification() {
     assert!(!tracker.is_unclean_shutdown());
     println!("  -> PASS: Active session lock detected unclean shutdown and cleared on clean exit");
 
-    println!("[Check 42] Validating Safe LogExpert XML (.lxp) Session Importer (Zero DTD / XXE)...");
+    println!(
+        "[Check 42] Validating Safe LogExpert XML (.lxp) Session Importer (Zero DTD / XXE)..."
+    );
     let lxp_xml = r#"<?xml version="1.0" encoding="utf-8"?>
 <LogExpertSession>
   <file>C:\logs\database.log</file>
   <file>C:\logs\backend.log</file>
 </LogExpertSession>"#;
-    let imported_lxp =
-        tylogger::core::SessionState::import_logexpert(lxp_xml).expect("Import LXP");
+    let imported_lxp = tylogger::core::SessionState::import_logexpert(lxp_xml).expect("Import LXP");
     assert_eq!(imported_lxp.documents.len(), 2);
     assert_eq!(
         imported_lxp.documents[0].path,
@@ -810,10 +811,7 @@ fn run_headless_verification() {
         Some("Auth Failure".to_string()),
         "Investigated".to_string()
     ));
-    assert_eq!(
-        bm_mgr.all()[0].label.as_deref(),
-        Some("Auth Failure")
-    );
+    assert_eq!(bm_mgr.all()[0].label.as_deref(), Some("Auth Failure"));
     println!("  -> PASS: Global bookmark registered, synchronized, and metadata updated");
 
     println!("[Check 44] Validating Bookmark MultiFile Rollover & Generation Drift Integrity...");
@@ -825,7 +823,9 @@ fn run_headless_verification() {
     );
     let bm_csv = bm_mgr.export_csv();
     assert!(bm_csv.contains("Auth Failure"));
-    println!("  -> PASS: Bookmark generation updated across rollover and exported with formula safety");
+    println!(
+        "  -> PASS: Bookmark generation updated across rollover and exported with formula safety"
+    );
 
     println!("[Check 45] Validating Extensible Plugin Architecture, Discovery & Length-Bounded IPC Protocol...");
     let mut reg = tylogger::core::PluginRegistry::new();
@@ -839,16 +839,20 @@ fn run_headless_verification() {
         columns: vec!["Time".to_string(), "Level".to_string(), "Msg".to_string()],
     };
     let ipc_frame = ipc_msg.encode_frame();
-    let decoded =
-        tylogger::core::PluginIpcMessage::decode_frame(&ipc_frame).expect("Decode IPC");
+    let decoded = tylogger::core::PluginIpcMessage::decode_frame(&ipc_frame).expect("Decode IPC");
     match decoded {
-        tylogger::core::PluginIpcMessage::HandshakeAck { plugin_name, columns } => {
+        tylogger::core::PluginIpcMessage::HandshakeAck {
+            plugin_name,
+            columns,
+        } => {
             assert_eq!(plugin_name, "StandaloneParser");
             assert_eq!(columns.len(), 3);
         }
         _ => panic!("Expected HandshakeAck"),
     }
-    println!("  -> PASS: Declarative packages discovered and length-bounded IPC frames encoded/decoded");
+    println!(
+        "  -> PASS: Declarative packages discovered and length-bounded IPC frames encoded/decoded"
+    );
 
     let _ = std::fs::remove_dir_all(&mf_dir);
     println!("=== ALL 45 VERIFICATION CHECKS PASSED ===");
