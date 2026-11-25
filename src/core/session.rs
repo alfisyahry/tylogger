@@ -20,25 +20,37 @@ pub struct SessionDocument {
     pub search_query: Option<String>,
     pub filter_pattern: Option<String>,
     pub bookmarks: Vec<usize>,
+    // Phase 5 additions
+    pub timeshift_offset_nanos: i64,
+    pub sync_group_id: Option<String>,
+    pub is_merged_source: bool,
 }
 
-/// Versioned Tylogger session state (.tysession and .tyworkspace v1).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Versioned Tylogger session state (.tysession and .tyworkspace v1 and v2).
+#[derive(Debug, Clone, PartialEq)]
 pub struct SessionState {
     pub schema_version: String,
     pub app_version: String,
     pub workspace_name: String,
     pub active_tab_idx: usize,
+    pub split_view_active: bool,
+    pub split_orientation: String,
+    pub split_secondary_doc_id: Option<usize>,
+    pub split_ratio: f32,
     pub documents: Vec<SessionDocument>,
 }
 
 impl Default for SessionState {
     fn default() -> Self {
         Self {
-            schema_version: "1.0".to_string(),
-            app_version: "0.4.0".to_string(),
+            schema_version: "2.0".to_string(),
+            app_version: "0.5.0".to_string(),
             workspace_name: "Default Workspace".to_string(),
             active_tab_idx: 0,
+            split_view_active: false,
+            split_orientation: "Horizontal".to_string(),
+            split_secondary_doc_id: None,
+            split_ratio: 0.5,
             documents: Vec::new(),
         }
     }
@@ -57,9 +69,27 @@ impl SessionState {
     pub fn new(name: &str) -> Self {
         Self {
             schema_version: "1.0".to_string(),
-            app_version: "0.4.0".to_string(),
+            app_version: "0.5.0".to_string(),
             workspace_name: name.to_string(),
             active_tab_idx: 0,
+            split_view_active: false,
+            split_orientation: "Horizontal".to_string(),
+            split_secondary_doc_id: None,
+            split_ratio: 0.5,
+            documents: Vec::new(),
+        }
+    }
+
+    pub fn new_v2(name: &str) -> Self {
+        Self {
+            schema_version: "2.0".to_string(),
+            app_version: "0.5.0".to_string(),
+            workspace_name: name.to_string(),
+            active_tab_idx: 0,
+            split_view_active: false,
+            split_orientation: "Horizontal".to_string(),
+            split_secondary_doc_id: None,
+            split_ratio: 0.5,
             documents: Vec::new(),
         }
     }
@@ -99,6 +129,20 @@ impl SessionState {
             self.workspace_name
         ));
         out.push_str(&format!("  \"active_tab_idx\": {},\n", self.active_tab_idx));
+        out.push_str(&format!(
+            "  \"split_view_active\": {},\n",
+            self.split_view_active
+        ));
+        out.push_str(&format!(
+            "  \"split_orientation\": \"{}\",\n",
+            self.split_orientation
+        ));
+        if let Some(sec_id) = self.split_secondary_doc_id {
+            out.push_str(&format!("  \"split_secondary_doc_id\": {},\n", sec_id));
+        } else {
+            out.push_str("  \"split_secondary_doc_id\": null,\n");
+        }
+        out.push_str(&format!("  \"split_ratio\": {:.2},\n", self.split_ratio));
         out.push_str("  \"documents\": [\n");
 
         for (i, doc) in self.documents.iter().enumerate() {
@@ -155,6 +199,19 @@ impl SessionState {
             } else {
                 out.push_str("      \"filter_pattern\": null,\n");
             }
+            out.push_str(&format!(
+                "      \"timeshift_offset_nanos\": {},\n",
+                doc.timeshift_offset_nanos
+            ));
+            if let Some(sg) = &doc.sync_group_id {
+                out.push_str(&format!("      \"sync_group_id\": \"{}\",\n", sg));
+            } else {
+                out.push_str("      \"sync_group_id\": null,\n");
+            }
+            out.push_str(&format!(
+                "      \"is_merged_source\": {},\n",
+                doc.is_merged_source
+            ));
             out.push_str("      \"bookmarks\": [");
             for (b_i, b) in doc.bookmarks.iter().enumerate() {
                 if b_i > 0 {
@@ -185,6 +242,18 @@ impl SessionState {
         if let Some(tab_idx) = extract_usize_val(json, "\"active_tab_idx\":") {
             state.active_tab_idx = tab_idx;
         }
+        if let Some(sv) = extract_bool_val(json, "\"split_view_active\":") {
+            state.split_view_active = sv;
+        }
+        if let Some(so) = extract_string_val(json, "\"split_orientation\":") {
+            state.split_orientation = so;
+        }
+        if let Some(sec_id) = extract_usize_val(json, "\"split_secondary_doc_id\":") {
+            state.split_secondary_doc_id = Some(sec_id);
+        }
+        if let Some(sr) = extract_f32_val(json, "\"split_ratio\":") {
+            state.split_ratio = sr;
+        }
 
         // Parse documents array
         if let Some(docs_start) = json.find("\"documents\":") {
@@ -209,6 +278,11 @@ impl SessionState {
                             .unwrap_or_else(|| "UTF-8".to_string());
                         let sq = extract_string_val(block, "\"search_query\":");
                         let fp = extract_string_val(block, "\"filter_pattern\":");
+                        let ts_offset =
+                            extract_i64_val(block, "\"timeshift_offset_nanos\":").unwrap_or(0);
+                        let sync_group = extract_string_val(block, "\"sync_group_id\":");
+                        let is_merged =
+                            extract_bool_val(block, "\"is_merged_source\":").unwrap_or(false);
 
                         // Extract bookmarks array
                         let mut bm = Vec::new();
@@ -242,6 +316,9 @@ impl SessionState {
                             search_query: sq,
                             filter_pattern: fp,
                             bookmarks: bm,
+                            timeshift_offset_nanos: ts_offset,
+                            sync_group_id: sync_group,
+                            is_merged_source: is_merged,
                         });
                     }
                 }
@@ -345,6 +422,9 @@ impl SessionState {
                             search_query: None,
                             filter_pattern: None,
                             bookmarks: Vec::new(),
+                            timeshift_offset_nanos: 0,
+                            sync_group_id: None,
+                            is_merged_source: false,
                         });
                         id_counter += 1;
                     }
@@ -440,6 +520,32 @@ fn extract_bool_val(json: &str, key: &str) -> Option<bool> {
     None
 }
 
+fn extract_i64_val(json: &str, key: &str) -> Option<i64> {
+    if let Some(pos) = json.find(key) {
+        let rem = &json[pos + key.len()..];
+        let num_str: String = rem
+            .chars()
+            .skip_while(|c| c.is_whitespace())
+            .take_while(|c| c.is_ascii_digit() || *c == '-')
+            .collect();
+        return num_str.parse::<i64>().ok();
+    }
+    None
+}
+
+fn extract_f32_val(json: &str, key: &str) -> Option<f32> {
+    if let Some(pos) = json.find(key) {
+        let rem = &json[pos + key.len()..];
+        let num_str: String = rem
+            .chars()
+            .skip_while(|c| c.is_whitespace())
+            .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
+            .collect();
+        return num_str.parse::<f32>().ok();
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448,6 +554,9 @@ mod tests {
     fn test_session_serialization_and_deserialization() {
         let mut session = SessionState::new("Incident Investigation");
         session.active_tab_idx = 1;
+        session.split_view_active = true;
+        session.split_orientation = "Vertical".to_string();
+        session.split_ratio = 0.6;
 
         let doc1 = SessionDocument {
             id: 1,
@@ -465,6 +574,9 @@ mod tests {
             search_query: Some("ERROR".to_string()),
             filter_pattern: None,
             bookmarks: vec![5, 42, 100],
+            timeshift_offset_nanos: 1_500_000_000,
+            sync_group_id: Some("prod-sync".to_string()),
+            is_merged_source: false,
         };
 
         let doc2 = SessionDocument {
@@ -483,6 +595,9 @@ mod tests {
             search_query: None,
             filter_pattern: Some("ERROR".to_string()),
             bookmarks: vec![0],
+            timeshift_offset_nanos: 0,
+            sync_group_id: None,
+            is_merged_source: false,
         };
 
         session.add_document(doc1);
@@ -496,15 +611,59 @@ mod tests {
         let json = session.to_json();
         assert!(json.contains("\"Incident Investigation\""));
         assert!(json.contains("\"active_tab_idx\": 1"));
+        assert!(json.contains("\"split_view_active\": true"));
+        assert!(json.contains("\"timeshift_offset_nanos\": 1500000000"));
 
         let restored = SessionState::from_json(&json).expect("Parse session JSON");
         assert_eq!(restored.workspace_name, "Incident Investigation");
         assert_eq!(restored.documents.len(), 2);
         assert_eq!(restored.documents[0].bookmarks, vec![5, 42, 100]);
+        assert_eq!(restored.documents[0].timeshift_offset_nanos, 1_500_000_000);
+        assert_eq!(restored.split_view_active, true);
         assert_eq!(
             restored.documents[1].filter_pattern,
             Some("ERROR".to_string())
         );
+    }
+
+    #[test]
+    fn test_schema_v1_to_v2_migration() {
+        // Legacy v1.0 session JSON without split_view or timeshift fields
+        let v1_json = r#"{
+  "schema_version": "1.0",
+  "app_version": "0.4.0",
+  "workspace_name": "Legacy Session",
+  "active_tab_idx": 0,
+  "documents": [
+    {
+      "id": 1,
+      "path": "C:\\logs\\legacy.log",
+      "title": "legacy.log",
+      "is_multifile": false,
+      "constituent_files": [],
+      "is_filtered_tab": false,
+      "parent_doc_id": null,
+      "columnizer_id": "plain",
+      "selected_line": 0,
+      "top_line": 0,
+      "follow_tail": true,
+      "encoding": "UTF-8",
+      "search_query": null,
+      "filter_pattern": null,
+      "bookmarks": [10, 20]
+    }
+  ]
+}"#;
+
+        let migrated = SessionState::from_json(v1_json).expect("Migrate v1.0 session");
+        assert_eq!(migrated.workspace_name, "Legacy Session");
+        assert_eq!(migrated.schema_version, "1.0");
+        assert_eq!(migrated.documents.len(), 1);
+        // Default safe values populated
+        assert_eq!(migrated.split_view_active, false);
+        assert_eq!(migrated.documents[0].timeshift_offset_nanos, 0);
+        assert_eq!(migrated.documents[0].sync_group_id, None);
+        assert_eq!(migrated.documents[0].bookmarks, vec![10, 20]);
     }
 
     #[test]

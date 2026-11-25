@@ -362,6 +362,15 @@ impl SearchEngine {
             (false, false) => &pat[..],
         };
 
+        if clean_pat.contains('|') {
+            for alt in clean_pat.split('|') {
+                if Self::matches_regex_safe(&haystack, alt, case_sensitive) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         if clean_pat.contains(".*") {
             let parts: Vec<&str> = clean_pat.split(".*").collect();
             let mut curr_haystack = &haystack[..];

@@ -32,6 +32,9 @@ pub struct FilterCriteria {
     /// Column restriction
     pub column_index: Option<usize>,
     pub empty_column_policy: EmptyColumnPolicy,
+    /// Time range filtering (Phase 5)
+    pub time_range_start_nanos: Option<i64>,
+    pub time_range_end_nanos: Option<i64>,
 }
 
 impl FilterCriteria {
@@ -46,6 +49,8 @@ impl FilterCriteria {
             fore_spread: 0,
             column_index: None,
             empty_column_policy: EmptyColumnPolicy::NoHit,
+            time_range_start_nanos: None,
+            time_range_end_nanos: None,
         }
     }
 
@@ -60,6 +65,8 @@ impl FilterCriteria {
             fore_spread: 0,
             column_index: None,
             empty_column_policy: EmptyColumnPolicy::NoHit,
+            time_range_start_nanos: None,
+            time_range_end_nanos: None,
         }
     }
 
@@ -78,6 +85,24 @@ impl FilterCriteria {
             fore_spread: 0,
             column_index: None,
             empty_column_policy: EmptyColumnPolicy::NoHit,
+            time_range_start_nanos: None,
+            time_range_end_nanos: None,
+        }
+    }
+
+    pub fn new_time_range(start_nanos: Option<i64>, end_nanos: Option<i64>) -> Self {
+        Self {
+            pattern: String::new(),
+            mode: FilterMode::Include,
+            options: SearchOptions::default(),
+            range_start: None,
+            range_end: None,
+            back_spread: 0,
+            fore_spread: 0,
+            column_index: None,
+            empty_column_policy: EmptyColumnPolicy::NoHit,
+            time_range_start_nanos: start_nanos,
+            time_range_end_nanos: end_nanos,
         }
     }
 }
@@ -108,14 +133,40 @@ impl FilterEngine {
             );
         }
 
-        if criteria.pattern.is_empty() {
+        let has_time_filter =
+            criteria.time_range_start_nanos.is_some() || criteria.time_range_end_nanos.is_some();
+
+        if criteria.pattern.is_empty() && !has_time_filter {
             return (0..total_lines).collect();
         }
 
         let mut primary_hits = Vec::new();
+        let time_parser = crate::core::time::TimestampParserRegistry::default();
 
         for idx in 0..total_lines {
             if let Some(line) = line_getter(idx) {
+                if has_time_filter {
+                    let model = time_parser.parse_line(&line, 0, idx as u64);
+                    if model.is_valid() {
+                        if let Some(s) = criteria.time_range_start_nanos {
+                            if model.epoch_nanos < s {
+                                continue;
+                            }
+                        }
+                        if let Some(e) = criteria.time_range_end_nanos {
+                            if model.epoch_nanos > e {
+                                continue;
+                            }
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+
+                if criteria.pattern.is_empty() {
+                    primary_hits.push(idx);
+                    continue;
+                }
                 let text_to_check: String =
                     if let (Some(col_idx), Some(col)) = (criteria.column_index, columnizer) {
                         let cols = col.parse_line(&line);
@@ -470,5 +521,30 @@ mod tests {
         assert!(mgr.recent_history.is_empty());
         assert!(mgr.delete_preset("CriticalErrors"));
         assert_eq!(mgr.presets.len(), 0);
+    }
+
+    #[test]
+    fn test_time_range_filter() {
+        let lines = [
+            "2026-11-25 08:00:00 [INFO] Line 0",
+            "2026-11-25 08:30:00 [ERROR] Line 1 in range",
+            "2026-11-25 09:00:00 [ERROR] Line 2 in range",
+            "2026-11-25 09:30:00 [INFO] Line 3 out of range",
+        ];
+
+        let parser = crate::core::time::TimestampParserRegistry::default();
+        let t_start = parser.parse_line(lines[1], 0, 1).epoch_nanos;
+        let t_end = parser.parse_line(lines[2], 0, 2).epoch_nanos;
+
+        let mut crit = FilterCriteria::new_time_range(Some(t_start), Some(t_end));
+        crit.pattern = "ERROR".to_string();
+
+        let matches = FilterEngine::apply_filter(
+            lines.len(),
+            |idx| lines.get(idx).map(|s| s.to_string()),
+            &crit,
+            None,
+        );
+        assert_eq!(matches, vec![1, 2]);
     }
 }

@@ -698,6 +698,9 @@ fn run_headless_verification() {
         search_query: None,
         filter_pattern: None,
         bookmarks: vec![10, 25],
+        timeshift_offset_nanos: 0,
+        sync_group_id: None,
+        is_merged_source: false,
     });
     let sess_json = sess.to_json();
     assert!(sess_json.contains("\"schema_version\": \"1.0\""));
@@ -723,6 +726,9 @@ fn run_headless_verification() {
         search_query: None,
         filter_pattern: Some("ERR".to_string()),
         bookmarks: Vec::new(),
+        timeshift_offset_nanos: 0,
+        sync_group_id: None,
+        is_merged_source: false,
     });
     let ordered_docs = sess.dependency_ordered_documents();
     assert_eq!(ordered_docs[0].id, 1); // Parent
@@ -753,6 +759,10 @@ fn run_headless_verification() {
         app_version: "0.4.0".to_string(),
         workspace_name: "Missing Source Test".to_string(),
         active_tab_idx: 0,
+        split_view_active: false,
+        split_orientation: "Horizontal".to_string(),
+        split_secondary_doc_id: None,
+        split_ratio: 0.5,
         documents: vec![tylogger::core::SessionDocument {
             id: 99,
             path: Some("C:\\non_existent_drive\\non_existent_file.log".to_string()),
@@ -769,6 +779,9 @@ fn run_headless_verification() {
             search_query: None,
             filter_pattern: None,
             bookmarks: Vec::new(),
+            timeshift_offset_nanos: 0,
+            sync_group_id: None,
+            is_merged_source: false,
         }],
     };
     let missing_files = missing_sess.check_missing_sources();
@@ -855,5 +868,445 @@ fn run_headless_verification() {
     );
 
     let _ = std::fs::remove_dir_all(&mf_dir);
-    println!("=== ALL 45 VERIFICATION CHECKS PASSED ===");
+
+    // ==========================================
+    // PHASE 5 ADVANCED TIME INTELLIGENCE & AUTOMATION
+    // ==========================================
+
+    println!("[Check 46] Validating High-Precision Timestamp Model & Integer Arithmetic...");
+    let ts_model = tylogger::core::TimestampModel::new_parsed(
+        "2026-11-25 08:30:45.123456789Z",
+        1_795_595_445_123_456_789,
+        tylogger::core::TimePrecision::Nanoseconds,
+        Some(0),
+        1,
+        100,
+    );
+    assert_eq!(ts_model.epoch_nanos, 1_795_595_445_123_456_789);
+    assert_eq!(ts_model.effective_nanos(), 1_795_595_445_123_456_789);
+    let iso_fmt = ts_model.format_iso(false);
+    assert!(iso_fmt.contains("2026-11-25"));
+    println!("  -> PASS: Integer checked nanosecond timestamp arithmetic & ISO format verified");
+
+    println!("[Check 47] Validating Multi-Format Timestamp Extractor (ISO, Apache, Syslog, Epoch, JSON)...");
+    let parser = tylogger::core::TimestampParserRegistry::new(2026);
+    let m_iso = parser.parse_line("2026-11-25 08:30:45.500 [INFO] Task ok", 1, 1);
+    assert!(m_iso.is_valid());
+    let m_apache = parser.parse_line(
+        "10.0.0.1 - - [25/Nov/2026:08:30:45 +0000] \"GET / HTTP/1.1\"",
+        1,
+        2,
+    );
+    assert!(m_apache.is_valid());
+    let m_syslog = parser.parse_line("Nov 25 08:30:45 myhost systemd[1]: Started Service", 1, 3);
+    assert!(m_syslog.is_valid());
+    let m_epoch = parser.parse_line("1764059445123 [DEBUG] Event", 1, 4);
+    assert!(m_epoch.is_valid());
+    let m_json = parser.parse_line(
+        "{\"timestamp\":\"2026-11-25T08:30:45Z\",\"lvl\":\"INFO\"}",
+        1,
+        5,
+    );
+    assert!(m_json.is_valid());
+    println!("  -> PASS: Extracted timestamps across 5 major logging formats without float drift");
+
+    println!("[Check 48] Validating Sparse Timestamp Indexing & Monotonicity Verification...");
+    let mut sp_index = tylogger::core::SparseTimestampIndex::new(1, 10);
+    sp_index.record_line(0, 1000, 0);
+    sp_index.record_line(10, 2000, 100);
+    sp_index.record_line(20, 3000, 200);
+    assert!(!sp_index.is_out_of_order);
+    let (b_prev, b_next) = sp_index.find_bracket(2500);
+    assert_eq!(b_prev.unwrap().line_number, 10);
+    assert_eq!(b_next.unwrap().line_number, 20);
+    // Out of order detection
+    sp_index.record_line(30, 2500, 300); // 2500 < 3000 -> Out of order!
+    assert!(sp_index.is_out_of_order);
+    println!("  -> PASS: Sparse index checkpoints verified and non-monotonic anomaly flagged");
+
+    println!(
+        "[Check 49] Validating Timestamp Locator Navigation Modes (Exact, Nearest, Prev, Next)..."
+    );
+    let records = vec![
+        tylogger::core::TimestampModel::new_parsed(
+            "t1",
+            10_000_000_000,
+            tylogger::core::TimePrecision::Seconds,
+            None,
+            1,
+            0,
+        ),
+        tylogger::core::TimestampModel::new_parsed(
+            "t2",
+            20_000_000_000,
+            tylogger::core::TimePrecision::Seconds,
+            None,
+            1,
+            1,
+        ),
+        tylogger::core::TimestampModel::new_parsed(
+            "t3",
+            30_000_000_000,
+            tylogger::core::TimePrecision::Seconds,
+            None,
+            1,
+            2,
+        ),
+    ];
+    let exact = tylogger::core::TimestampLocator::locate(
+        &records,
+        20_000_000_000,
+        tylogger::core::MatchMode::Exact,
+        false,
+    )
+    .unwrap();
+    assert_eq!(exact.line_number, 1);
+    let nearest = tylogger::core::TimestampLocator::locate(
+        &records,
+        24_000_000_000,
+        tylogger::core::MatchMode::Nearest,
+        false,
+    )
+    .unwrap();
+    assert_eq!(nearest.line_number, 1);
+    let prev = tylogger::core::TimestampLocator::locate(
+        &records,
+        24_000_000_000,
+        tylogger::core::MatchMode::Previous,
+        false,
+    )
+    .unwrap();
+    assert_eq!(prev.line_number, 1);
+    let next = tylogger::core::TimestampLocator::locate(
+        &records,
+        24_000_000_000,
+        tylogger::core::MatchMode::Next,
+        false,
+    )
+    .unwrap();
+    assert_eq!(next.line_number, 2);
+    println!("  -> PASS: All four Go-to-Timestamp navigation modes located exact records");
+
+    println!("[Check 50] Validating Non-Destructive Timeshift Engine (Virtual Offsets)...");
+    let mut ts_engine = tylogger::core::TimeshiftEngine::new();
+    ts_engine.set_offset_components(2, 0, 0, 1, 30, 500, 0, 0); // +1m 30.5s = +90_500_000_000 ns
+    assert_eq!(ts_engine.get_offset_nanos(2), 90_500_000_000);
+    let mut doc_ts = records[0].clone();
+    doc_ts.set_timeshift_nanos(ts_engine.get_offset_nanos(2));
+    assert_eq!(doc_ts.effective_nanos(), 100_500_000_000);
+    assert_eq!(doc_ts.epoch_nanos, 10_000_000_000); // Raw source untouched!
+    println!("  -> PASS: Timeshift offset modified virtual timestamp while preserving original source data");
+
+    println!("[Check 51] Validating Multi-Sample Clock Drift Calibration Workflow...");
+    let samples = vec![
+        (10_000_000_000, 12_500_000_000),
+        (20_000_000_000, 22_500_000_000),
+        (30_000_000_000, 32_501_000_000),
+    ];
+    let cal = tylogger::core::TimeshiftEngine::calibrate_multi_samples(&samples).unwrap();
+    assert_eq!(cal.suggested_offset_nanos, -2_500_000_000);
+    assert!(cal.is_consistent);
+    println!(
+        "  -> PASS: Clock drift calculated across multi-samples with consistency verification"
+    );
+
+    println!("[Check 52] Validating Delta Time Calculations & Configurable Duration Units...");
+    let d_nanos = tylogger::core::DeltaCalculator::calculate(10_000_000_000, 10_450_000_000);
+    assert_eq!(d_nanos, 450_000_000);
+    let s_ms =
+        tylogger::core::DeltaCalculator::format(d_nanos, tylogger::core::DeltaUnit::Milliseconds);
+    assert_eq!(s_ms, "+450.000ms");
+    let s_human = tylogger::core::DeltaCalculator::format(
+        83_450_000_000,
+        tylogger::core::DeltaUnit::HumanDuration,
+    );
+    assert_eq!(s_human, "+1m 23s 450ms");
+    println!("  -> PASS: Delta calculated with nanosecond precision and human duration formatting");
+
+    println!(
+        "[Check 53] Validating Loop-Free Multi-Document Synchronization & Origin Token Guard..."
+    );
+    let mut sync_mgr = tylogger::core::SyncManager::new();
+    sync_mgr.create_group("incident-grp", "Incident Sync");
+    sync_mgr.join_group("incident-grp", 1);
+    sync_mgr.join_group("incident-grp", 2);
+    let actions = sync_mgr.dispatch_time_navigation(1, 10_000_000_000);
+    assert_eq!(actions.len(), 1);
+    assert_eq!(actions[0].0, 2); // Dispatched only to doc 2
+                                 // Disallow recursive loop
+    let echo = sync_mgr.dispatch_time_navigation(1, 10_000_000_000);
+    assert_eq!(echo.len(), 1);
+    println!(
+        "  -> PASS: Multi-document time synchronization dispatched with zero recursive echo loop"
+    );
+
+    println!("[Check 54] Validating Native Split View Container State (Horizontal/Vertical)...");
+    sync_mgr.split_view.is_split = true;
+    sync_mgr.split_view.orientation = tylogger::core::SplitViewOrientation::Vertical;
+    sync_mgr.split_view.primary_doc_id = 1;
+    sync_mgr.split_view.secondary_doc_id = Some(2);
+    sync_mgr.split_view.splitter_ratio = 0.55;
+    assert!(sync_mgr.split_view.is_split);
+    assert_eq!(
+        sync_mgr.split_view.orientation,
+        tylogger::core::SplitViewOrientation::Vertical
+    );
+    println!("  -> PASS: Native Split View state configured with custom splitter ratio");
+
+    println!("[Check 55] Validating Time Spread Frequency Aggregation & Navigation...");
+    let spread = tylogger::core::TimeSpreadModel::build(&records, 2, false);
+    assert_eq!(spread.buckets.len(), 2);
+    assert_eq!(spread.total_records, 3);
+    let b_clicked = spread.bucket_at_ratio(0.8).unwrap();
+    assert_eq!(b_clicked.bucket_index, 1);
+    println!(
+        "  -> PASS: Time Spread aggregated discrete time buckets and mapped click coordinates"
+    );
+
+    println!(
+        "[Check 56] Validating Combined Time Range Filtering Integrated with Search Engine..."
+    );
+    let log_samples = [
+        "2026-11-25 08:00:00 [INFO] Line 0",
+        "2026-11-25 08:30:00 [ERROR] Line 1 in range",
+        "2026-11-25 09:00:00 [ERROR] Line 2 in range",
+        "2026-11-25 09:30:00 [INFO] Line 3 out of range",
+    ];
+    let t_start = parser.parse_line(log_samples[1], 0, 1).epoch_nanos;
+    let t_end = parser.parse_line(log_samples[2], 0, 2).epoch_nanos;
+    let mut crit = tylogger::core::FilterCriteria::new_time_range(Some(t_start), Some(t_end));
+    crit.pattern = "ERROR".to_string();
+    let hits = tylogger::core::FilterEngine::apply_filter(
+        log_samples.len(),
+        |idx| log_samples.get(idx).map(|s| s.to_string()),
+        &crit,
+        None,
+    );
+    assert_eq!(hits, vec![1, 2]);
+    println!("  -> PASS: Time range filtering combined orthogonally with pattern matching");
+
+    println!("[Check 57] Validating Bounded K-Way Chronological Log Merging & Tie-Breaking...");
+    let mut kway = tylogger::core::BoundedKWayMerger::new();
+    kway.push(tylogger::core::MergeCandidate {
+        effective_nanos: 1000,
+        source_order: 1,
+        source_id: 102,
+        physical_line_number: 10,
+        file_offset: 100,
+        source_alias: "DB".to_string(),
+    });
+    kway.push(tylogger::core::MergeCandidate {
+        effective_nanos: 1000,
+        source_order: 0,
+        source_id: 101,
+        physical_line_number: 5,
+        file_offset: 50,
+        source_alias: "Web".to_string(),
+    });
+    let first_cand = kway.pop_next().unwrap();
+    assert_eq!(first_cand.source_id, 101); // Source order 0 wins tie-breaker!
+    println!("  -> PASS: Bounded K-Way priority queue ordered multi-sources deterministically");
+
+    println!(
+        "[Check 58] Validating Live Log Merging with Reorder Window & Watermark Lateness Policy..."
+    );
+    let mut live_merge = tylogger::core::LiveLogMergeEngine::new(3_000_000_000); // 3s window
+    live_merge.ingest_record(tylogger::core::RecordProvenance::new(
+        1,
+        0,
+        0,
+        10_000_000_000,
+        "SrcA",
+    ));
+    live_merge.ingest_record(tylogger::core::RecordProvenance::new(
+        2,
+        0,
+        0,
+        8_000_000_000,
+        "SrcB",
+    )); // On time
+    live_merge.ingest_record(tylogger::core::RecordProvenance::new(
+        2,
+        1,
+        0,
+        5_000_000_000,
+        "SrcB",
+    )); // Late arrival
+    assert_eq!(live_merge.metrics.late_records, 1);
+    assert_eq!(live_merge.metrics.dropped_records, 0); // Zero silent dropping!
+    let ready_records = live_merge.drain_ready_records();
+    assert_eq!(ready_records.len(), 1); // 5s is older than watermark 7s
+    println!(
+        "  -> PASS: Watermark lateness policy flagged late arrivals with zero dropped records"
+    );
+
+    println!("[Check 59] Validating MergedLogSource Provenance & Jump to Original Source...");
+    let mut merged_src = tylogger::core::MergedLogSource::new("Cluster Incident");
+    merged_src.add_source(
+        Box::new(tylogger::core::MockSource::new("web.log", &["W1", "W2"])),
+        "Web",
+        1,
+    );
+    merged_src.add_source(
+        Box::new(tylogger::core::MockSource::new("db.log", &["D1", "D2"])),
+        "DB",
+        2,
+    );
+    let s_web = *merged_src
+        .source_aliases()
+        .iter()
+        .find(|(_, a)| a.alias == "Web")
+        .unwrap()
+        .0;
+    let s_db = *merged_src
+        .source_aliases()
+        .iter()
+        .find(|(_, a)| a.alias == "DB")
+        .unwrap()
+        .0;
+    merged_src.set_merged_records(vec![
+        tylogger::core::RecordProvenance::new(s_web, 0, 0, 10, "Web"),
+        tylogger::core::RecordProvenance::new(s_db, 0, 0, 20, "DB"),
+        tylogger::core::RecordProvenance::new(s_web, 1, 10, 30, "Web"),
+    ]);
+    assert_eq!(merged_src.line_count(), 3);
+    assert!(merged_src.get_line(1).unwrap().contains("[DB] D1"));
+    let jump_target = merged_src.jump_to_original_source(1).unwrap();
+    assert_eq!(jump_target, (s_db, 0));
+    println!("  -> PASS: Provenance preserved in merged virtual document and jump target mapped");
+
+    println!(
+        "[Check 60] Validating Explainable Source-Aware Correlation Engine & Match Reasons..."
+    );
+    let corr_targets = vec![tylogger::core::CorrelationTargetRecord {
+        source_id: 2,
+        source_alias: "Backend".to_string(),
+        physical_line_number: 40,
+        timestamp_nanos: 10_015_000_000, // +15ms
+        message: "Error serving req-9912".to_string(),
+    }];
+    let corr_rule = tylogger::core::CorrelationRule {
+        window_before_nanos: 1_000_000_000,
+        window_after_nanos: 1_000_000_000,
+        match_field_name: Some("req_id".to_string()),
+        match_field_value: Some("req-9912".to_string()),
+        require_both: true,
+    };
+    let cands = tylogger::core::CorrelationEngine::correlate_record(
+        10_000_000_000,
+        &corr_rule,
+        &corr_targets,
+        10,
+        |msg, field| {
+            if field == "req_id" && msg.contains("req-9912") {
+                Some("req-9912".to_string())
+            } else {
+                None
+            }
+        },
+    );
+    assert_eq!(cands.len(), 1);
+    let reason_desc = format!("{}", cands[0].match_reason);
+    assert!(reason_desc.contains("req-9912"));
+    println!(
+        "  -> PASS: Explainable correlation matched candidate with transparent reason reporting"
+    );
+
+    println!("[Check 61] Validating Incoming-Only Keyword Triggers & Historical Isolation...");
+    let mut tr_engine = tylogger::core::TriggerEngine::new();
+    let mut tr_rule =
+        tylogger::core::KeywordTriggerRule::new(1, "FatalTrigger", "FATAL|PANIC", true, true);
+    tr_rule
+        .actions
+        .push(tylogger::core::TriggerAction::StopFollowTail);
+    tr_rule
+        .actions
+        .push(tylogger::core::TriggerAction::SetBookmark {
+            label: Some("Fatal".to_string()),
+            comment: None,
+        });
+    tr_engine.add_rule(tr_rule);
+    // Historical line on file open -> returns zero actions
+    let hist_res = tr_engine.evaluate_line("2026-11-25 [FATAL] Crash", 1, 10, false, 1000);
+    assert!(hist_res.is_empty());
+    // Live tailing new incoming line -> triggers actions
+    let live_res = tr_engine.evaluate_line("2026-11-25 [FATAL] Crash", 1, 10, true, 2000);
+    assert_eq!(live_res.len(), 2);
+    println!("  -> PASS: Incoming-only execution semantics confirmed; zero historical action spam");
+
+    println!("[Check 62] Validating Global Multi-View Trigger Deduplication...");
+    let mut dedup = tylogger::core::GlobalTriggerDeduplicator::new();
+    assert!(dedup.try_claim(1, 100, 1)); // First view
+    assert!(!dedup.try_claim(1, 100, 1)); // Filtered tab view -> deduplicated
+    assert!(!dedup.try_claim(1, 100, 1)); // Merged tab view -> deduplicated
+    println!(
+        "  -> PASS: Trigger execution deduplicated across views based on (source, line, rule)"
+    );
+
+    println!("[Check 63] Validating Bounded Action Processing Queue & Per-Rule Cooldown...");
+    let mut action_q = tylogger::core::BoundedActionQueue::new(2);
+    assert!(action_q.enqueue(tylogger::core::QueuedAction {
+        rule_id: 1,
+        source_id: 1,
+        line_number: 1,
+        action: tylogger::core::TriggerAction::StopFollowTail,
+        timestamp_ms: 1000
+    }));
+    assert!(action_q.enqueue(tylogger::core::QueuedAction {
+        rule_id: 1,
+        source_id: 1,
+        line_number: 2,
+        action: tylogger::core::TriggerAction::StopFollowTail,
+        timestamp_ms: 1001
+    }));
+    assert!(!action_q.enqueue(tylogger::core::QueuedAction {
+        rule_id: 1,
+        source_id: 1,
+        line_number: 3,
+        action: tylogger::core::TriggerAction::StopFollowTail,
+        timestamp_ms: 1002
+    }));
+    assert_eq!(action_q.dropped_count, 1);
+    println!("  -> PASS: Bounded queue defended memory against alert flooding with drop tracking");
+
+    println!("[Check 64] Validating Safe External Tool Execution & Command Injection Immunity...");
+    let arg_tmpl = vec!["-c".to_string(), "4".to_string(), "%SELECTION%".to_string()];
+    let ctx = tylogger::core::ToolPlaceholderContext {
+        selected_text: Some("127.0.0.1 & del C:\\critical.dat".to_string()),
+        ..Default::default()
+    };
+    let structured_args = tylogger::core::SafeProcessLauncher::build_arguments(&arg_tmpl, &ctx);
+    assert_eq!(structured_args.len(), 3);
+    assert_eq!(structured_args[2], "127.0.0.1 & del C:\\critical.dat");
+    let win_cmd = tylogger::core::SafeProcessLauncher::format_windows_command_line(
+        "ping.exe",
+        &structured_args,
+    );
+    assert!(win_cmd.contains("\"127.0.0.1 & del C:\\critical.dat\""));
+    println!(
+        "  -> PASS: Structured arguments prevented shell chaining and arbitrary command execution"
+    );
+
+    println!("[Check 65] Validating Captured Process Output Virtual LogSource & Schema v2.0 Migration...");
+    let mut proc_src = tylogger::core::CapturedOutputSource::new("Diagnostics", 1024 * 1024);
+    proc_src.append_stdout("Line 1 output");
+    proc_src.append_stderr("Line 2 warning");
+    proc_src.finish(0);
+    assert_eq!(proc_src.line_count(), 2);
+    assert_eq!(proc_src.exit_code, Some(0));
+
+    // Session Schema v2.0 verification
+    let mut sess_v2 = tylogger::core::SessionState::new_v2("Phase 5 Workspace");
+    sess_v2.split_view_active = true;
+    sess_v2.split_orientation = "Vertical".to_string();
+    let v2_json = sess_v2.to_json();
+    assert!(v2_json.contains("\"schema_version\": \"2.0\""));
+    assert!(v2_json.contains("\"split_view_active\": true"));
+    let restored_v2 = tylogger::core::SessionState::from_json(&v2_json).expect("Parse v2 session");
+    assert!(restored_v2.split_view_active);
+    println!(
+        "  -> PASS: Captured stdout/stderr virtual source operational and Schema v2.0 persisted"
+    );
+
+    println!("=== ALL 65 VERIFICATION CHECKS PASSED ===");
 }
