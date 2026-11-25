@@ -60,7 +60,8 @@ impl FilterEngine {
 
         for idx in 0..total_lines {
             if let Some(line) = line_getter(idx) {
-                let matches_pattern = SearchEngine::matches_line(&line, &criteria.pattern, &criteria.options);
+                let matches_pattern =
+                    SearchEngine::matches_line(&line, &criteria.pattern, &criteria.options);
                 let should_include = match criteria.mode {
                     FilterMode::Include => matches_pattern,
                     FilterMode::Exclude => !matches_pattern,

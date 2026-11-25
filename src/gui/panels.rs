@@ -1,8 +1,8 @@
 use std::os::windows::ffi::OsStrExt;
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::{
-    CreateSolidBrush, DeleteObject, FillRect, SelectObject, SetBkMode, SetTextColor, TextOutW,
-    HDC, HGDIOBJ, TRANSPARENT,
+    CreateSolidBrush, DeleteObject, FillRect, SelectObject, SetBkMode, SetTextColor, TextOutW, HDC,
+    HGDIOBJ, TRANSPARENT,
 };
 
 use crate::core::workspace::Document;
@@ -55,13 +55,7 @@ impl InspectionPanels {
     }
 
     /// Hit-tests mouse click inside inspection panels area (y relative to panel top: 0..height).
-    pub fn hit_test(
-        &mut self,
-        x: i32,
-        y: i32,
-        width: i32,
-        doc: Option<&Document>,
-    ) -> PanelAction {
+    pub fn hit_test(&mut self, x: i32, y: i32, width: i32, doc: Option<&Document>) -> PanelAction {
         if y < 0 || y >= self.height {
             return PanelAction::None;
         }
@@ -180,9 +174,24 @@ impl InspectionPanels {
         let tab3_label = "Line Inspector".to_string();
 
         let tabs = [
-            (&tab1_label, 8, 140, self.active_tab == ActivePanelTab::FilterResults),
-            (&tab2_label, 144, 260, self.active_tab == ActivePanelTab::Bookmarks),
-            (&tab3_label, 264, 380, self.active_tab == ActivePanelTab::LineInspector),
+            (
+                &tab1_label,
+                8,
+                140,
+                self.active_tab == ActivePanelTab::FilterResults,
+            ),
+            (
+                &tab2_label,
+                144,
+                260,
+                self.active_tab == ActivePanelTab::Bookmarks,
+            ),
+            (
+                &tab3_label,
+                264,
+                380,
+                self.active_tab == ActivePanelTab::LineInspector,
+            ),
         ];
 
         for (label, left_x, right_x, is_active) in tabs {
@@ -238,10 +247,17 @@ impl InspectionPanels {
             ActivePanelTab::FilterResults => {
                 if doc.filter_matches.is_empty() {
                     SetTextColor(hdc, theme.text_disabled.to_colorref());
-                    let empty_msg: Vec<u16> = "No filter applied. Use Filter -> Filter Results (Ctrl+Shift+F).\0"
-                        .encode_utf16()
-                        .collect();
-                    TextOutW(hdc, 16, content_y_start + 12, empty_msg.as_ptr(), (empty_msg.len() - 1) as _);
+                    let empty_msg: Vec<u16> =
+                        "No filter applied. Use Filter -> Filter Results (Ctrl+Shift+F).\0"
+                            .encode_utf16()
+                            .collect();
+                    TextOutW(
+                        hdc,
+                        16,
+                        content_y_start + 12,
+                        empty_msg.as_ptr(),
+                        (empty_msg.len() - 1) as _,
+                    );
                 } else {
                     let row_h = 20;
                     let visible_rows = (content_height / row_h) as usize;
@@ -256,14 +272,22 @@ impl InspectionPanels {
                         // Line number
                         SetTextColor(hdc, theme.accent_primary.to_colorref());
                         let num_str = format!("Line {:<6}", source_line + 1);
-                        let wide_num: Vec<u16> = std::ffi::OsStr::new(&num_str).encode_wide().collect();
+                        let wide_num: Vec<u16> =
+                            std::ffi::OsStr::new(&num_str).encode_wide().collect();
                         TextOutW(hdc, 12, py + 2, wide_num.as_ptr(), wide_num.len() as _);
 
                         // Line text
                         if let Ok(line_text) = doc.get_line(source_line) {
                             SetTextColor(hdc, theme.text_primary.to_colorref());
-                            let wide_txt: Vec<u16> = std::ffi::OsStr::new(&line_text).encode_wide().collect();
-                            TextOutW(hdc, 96, py + 2, wide_txt.as_ptr(), wide_txt.len().min(120) as _);
+                            let wide_txt: Vec<u16> =
+                                std::ffi::OsStr::new(&line_text).encode_wide().collect();
+                            TextOutW(
+                                hdc,
+                                96,
+                                py + 2,
+                                wide_txt.as_ptr(),
+                                wide_txt.len().min(120) as _,
+                            );
                         }
                     }
                 }
@@ -272,10 +296,17 @@ impl InspectionPanels {
                 let bms = doc.bookmarks().to_vec();
                 if bms.is_empty() {
                     SetTextColor(hdc, theme.text_disabled.to_colorref());
-                    let empty_msg: Vec<u16> = "No bookmarks yet. Press F2 or click the left gutter to bookmark a line.\0"
-                        .encode_utf16()
-                        .collect();
-                    TextOutW(hdc, 16, content_y_start + 12, empty_msg.as_ptr(), (empty_msg.len() - 1) as _);
+                    let empty_msg: Vec<u16> =
+                        "No bookmarks yet. Press F2 or click the left gutter to bookmark a line.\0"
+                            .encode_utf16()
+                            .collect();
+                    TextOutW(
+                        hdc,
+                        16,
+                        content_y_start + 12,
+                        empty_msg.as_ptr(),
+                        (empty_msg.len() - 1) as _,
+                    );
                 } else {
                     let row_h = 20;
                     let visible_rows = (content_height / row_h) as usize;
@@ -289,13 +320,21 @@ impl InspectionPanels {
 
                         SetTextColor(hdc, theme.accent_primary.to_colorref());
                         let num_str = format!("Bookmark on Line {:<6}", source_line + 1);
-                        let wide_num: Vec<u16> = std::ffi::OsStr::new(&num_str).encode_wide().collect();
+                        let wide_num: Vec<u16> =
+                            std::ffi::OsStr::new(&num_str).encode_wide().collect();
                         TextOutW(hdc, 12, py + 2, wide_num.as_ptr(), wide_num.len() as _);
 
                         if let Ok(line_text) = doc.get_line(source_line) {
                             SetTextColor(hdc, theme.text_primary.to_colorref());
-                            let wide_txt: Vec<u16> = std::ffi::OsStr::new(&line_text).encode_wide().collect();
-                            TextOutW(hdc, 180, py + 2, wide_txt.as_ptr(), wide_txt.len().min(120) as _);
+                            let wide_txt: Vec<u16> =
+                                std::ffi::OsStr::new(&line_text).encode_wide().collect();
+                            TextOutW(
+                                hdc,
+                                180,
+                                py + 2,
+                                wide_txt.as_ptr(),
+                                wide_txt.len().min(120) as _,
+                            );
                         }
                     }
                 }
@@ -304,13 +343,32 @@ impl InspectionPanels {
                 let sel_line = doc.selected_line;
                 if let Ok(line_text) = doc.get_line(sel_line) {
                     SetTextColor(hdc, theme.text_secondary.to_colorref());
-                    let meta_str = format!("Line {}: {} characters, {} bytes", sel_line + 1, line_text.chars().count(), line_text.len());
-                    let wide_meta: Vec<u16> = std::ffi::OsStr::new(&meta_str).encode_wide().collect();
-                    TextOutW(hdc, 16, content_y_start + 8, wide_meta.as_ptr(), wide_meta.len() as _);
+                    let meta_str = format!(
+                        "Line {}: {} characters, {} bytes",
+                        sel_line + 1,
+                        line_text.chars().count(),
+                        line_text.len()
+                    );
+                    let wide_meta: Vec<u16> =
+                        std::ffi::OsStr::new(&meta_str).encode_wide().collect();
+                    TextOutW(
+                        hdc,
+                        16,
+                        content_y_start + 8,
+                        wide_meta.as_ptr(),
+                        wide_meta.len() as _,
+                    );
 
                     SetTextColor(hdc, theme.text_primary.to_colorref());
-                    let wide_txt: Vec<u16> = std::ffi::OsStr::new(&line_text).encode_wide().collect();
-                    TextOutW(hdc, 16, content_y_start + 32, wide_txt.as_ptr(), wide_txt.len().min(180) as _);
+                    let wide_txt: Vec<u16> =
+                        std::ffi::OsStr::new(&line_text).encode_wide().collect();
+                    TextOutW(
+                        hdc,
+                        16,
+                        content_y_start + 32,
+                        wide_txt.as_ptr(),
+                        wide_txt.len().min(180) as _,
+                    );
                 }
             }
         }

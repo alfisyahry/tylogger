@@ -26,7 +26,12 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn new(id: usize, path: Option<PathBuf>, title: String, reader: NonLockingLogReader) -> Self {
+    pub fn new(
+        id: usize,
+        path: Option<PathBuf>,
+        title: String,
+        reader: NonLockingLogReader,
+    ) -> Self {
         Self {
             id,
             path,
@@ -98,7 +103,9 @@ impl Workspace {
     /// Opens a log file in a new tab, or switches to it if already open.
     pub fn open_file<P: AsRef<Path>>(&mut self, path: P) -> Result<usize, String> {
         let path_ref = path.as_ref();
-        let canonical_target = path_ref.canonicalize().unwrap_or_else(|_| path_ref.to_path_buf());
+        let canonical_target = path_ref
+            .canonicalize()
+            .unwrap_or_else(|_| path_ref.to_path_buf());
 
         // Check if already open
         for (idx, doc) in self.documents.iter().enumerate() {

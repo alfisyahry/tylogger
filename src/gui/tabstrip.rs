@@ -22,7 +22,13 @@ pub struct TabStrip;
 
 impl TabStrip {
     /// Hit-tests a point (x, y) relative to the tab strip.
-    pub fn hit_test(workspace: &Workspace, x: i32, y: i32, is_right_click: bool, is_middle_click: bool) -> TabHitResult {
+    pub fn hit_test(
+        workspace: &Workspace,
+        x: i32,
+        y: i32,
+        is_right_click: bool,
+        is_middle_click: bool,
+    ) -> TabHitResult {
         if y < 0 || y >= TABSTRIP_HEIGHT || workspace.is_empty() {
             return TabHitResult::None;
         }
@@ -108,9 +114,15 @@ impl TabStrip {
             };
 
             let (tab_bg, text_color) = if is_active {
-                (theme.surface_primary.to_colorref(), theme.text_primary.to_colorref())
+                (
+                    theme.surface_primary.to_colorref(),
+                    theme.text_primary.to_colorref(),
+                )
             } else {
-                (theme.surface_secondary.to_colorref(), theme.text_secondary.to_colorref())
+                (
+                    theme.surface_secondary.to_colorref(),
+                    theme.text_secondary.to_colorref(),
+                )
             };
 
             let t_brush = CreateSolidBrush(tab_bg);
@@ -149,18 +161,32 @@ impl TabStrip {
 
             // Draw Tab Title (truncated if long)
             SetTextColor(hdc, text_color);
-            let title_prefix = if doc.has_new_activity && !is_active { "  " } else { "" };
+            let title_prefix = if doc.has_new_activity && !is_active {
+                "  "
+            } else {
+                ""
+            };
             let display_title = format!("{}{}", title_prefix, doc.title);
-            let wide_title: Vec<u16> = std::ffi::OsStr::new(&display_title)
-                .encode_wide()
-                .collect();
+            let wide_title: Vec<u16> = std::ffi::OsStr::new(&display_title).encode_wide().collect();
             let title_len = wide_title.len().min(14);
-            TextOutW(hdc, curr_x + 8, y_offset + 6, wide_title.as_ptr(), title_len as _);
+            TextOutW(
+                hdc,
+                curr_x + 8,
+                y_offset + 6,
+                wide_title.as_ptr(),
+                title_len as _,
+            );
 
             // Draw Close 'x' button
             SetTextColor(hdc, theme.text_muted.to_colorref());
             let close_x: Vec<u16> = "×\0".encode_utf16().collect();
-            TextOutW(hdc, curr_x + tab_width - 16, y_offset + 5, close_x.as_ptr(), 1);
+            TextOutW(
+                hdc,
+                curr_x + tab_width - 16,
+                y_offset + 5,
+                close_x.as_ptr(),
+                1,
+            );
 
             curr_x += tab_width + 4;
         }

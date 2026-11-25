@@ -1,6 +1,6 @@
-/// Centralized command registry for Tylogger.
-/// Ensures consistent IDs, labels, shortcuts, and handlers across
-/// Menu Bar, Toolbar, Context Menus, and Keyboard Accelerators.
+//! Centralized command registry for Tylogger.
+//! Ensures consistent IDs, labels, shortcuts, and handlers across
+//! Menu Bar, Toolbar, Context Menus, and Keyboard Accelerators.
 
 pub const ID_FILE_OPEN: u16 = 1001;
 pub const ID_FILE_OPEN_MULTI: u16 = 1002;

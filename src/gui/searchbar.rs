@@ -195,9 +195,15 @@ impl SearchBar {
             };
 
             let (btn_bg, text_color) = if is_active {
-                (theme.accent_primary.to_colorref(), theme.accent_on_solid.to_colorref())
+                (
+                    theme.accent_primary.to_colorref(),
+                    theme.accent_on_solid.to_colorref(),
+                )
             } else {
-                (theme.surface_primary.to_colorref(), theme.text_primary.to_colorref())
+                (
+                    theme.surface_primary.to_colorref(),
+                    theme.text_primary.to_colorref(),
+                )
             };
 
             let b_brush = CreateSolidBrush(btn_bg);

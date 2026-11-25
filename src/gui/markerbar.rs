@@ -1,7 +1,5 @@
 use windows_sys::Win32::Foundation::RECT;
-use windows_sys::Win32::Graphics::Gdi::{
-    CreateSolidBrush, DeleteObject, FillRect, FrameRect, HDC,
-};
+use windows_sys::Win32::Graphics::Gdi::{CreateSolidBrush, DeleteObject, FillRect, FrameRect, HDC};
 
 use crate::core::workspace::Document;
 use crate::gui::theme::ThemeTokens;
@@ -107,7 +105,8 @@ impl MarkerBar {
         // 3. Viewport thumb overlay (indicates current scroll position and visible fraction)
         let visible_lines = 30.min(total_lines);
         let thumb_top = y + ((doc.top_line as f64 / total_lines as f64) * height as f64) as i32;
-        let thumb_height = ((visible_lines as f64 / total_lines as f64) * height as f64).max(6.0) as i32;
+        let thumb_height =
+            ((visible_lines as f64 / total_lines as f64) * height as f64).max(6.0) as i32;
 
         let thumb_rect = RECT {
             left: x + 1,

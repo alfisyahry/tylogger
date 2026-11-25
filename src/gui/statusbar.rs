@@ -1,8 +1,8 @@
 use std::os::windows::ffi::OsStrExt;
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::{
-    CreateSolidBrush, DeleteObject, FillRect, SelectObject, SetBkMode, SetTextColor, TextOutW,
-    HDC, HGDIOBJ, TRANSPARENT,
+    CreateSolidBrush, DeleteObject, FillRect, SelectObject, SetBkMode, SetTextColor, TextOutW, HDC,
+    HGDIOBJ, TRANSPARENT,
 };
 
 use crate::core::workspace::Document;
@@ -89,9 +89,23 @@ impl StatusBar {
                     String::new()
                 };
 
-                (tail_status, d.encoding.as_str(), size, lines, cursor, search)
+                (
+                    tail_status,
+                    d.encoding.as_str(),
+                    size,
+                    lines,
+                    cursor,
+                    search,
+                )
             }
-            None => ("[IDLE]", "None", "0 B".to_string(), "No documents".to_string(), "".to_string(), "".to_string()),
+            None => (
+                "[IDLE]",
+                "None",
+                "0 B".to_string(),
+                "No documents".to_string(),
+                "".to_string(),
+                "".to_string(),
+            ),
         };
 
         // Draw segments with vertical separators

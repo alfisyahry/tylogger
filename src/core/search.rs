@@ -2,21 +2,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// Search configuration options.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SearchOptions {
     pub case_sensitive: bool,
     pub whole_word: bool,
     pub is_regex: bool,
-}
-
-impl Default for SearchOptions {
-    fn default() -> Self {
-        Self {
-            case_sensitive: false,
-            whole_word: false,
-            is_regex: false,
-        }
-    }
 }
 
 /// Result of an asynchronous search operation.
@@ -81,7 +71,12 @@ impl SearchEngine {
         }
     }
 
-    fn matches_plain_text(line: &str, pattern: &str, case_sensitive: bool, whole_word: bool) -> bool {
+    fn matches_plain_text(
+        line: &str,
+        pattern: &str,
+        case_sensitive: bool,
+        whole_word: bool,
+    ) -> bool {
         if !whole_word {
             if case_sensitive {
                 line.contains(pattern)
@@ -252,9 +247,21 @@ mod tests {
 
     #[test]
     fn test_plain_text_search() {
-        let opt_ci = SearchOptions { case_sensitive: false, whole_word: false, is_regex: false };
-        let opt_cs = SearchOptions { case_sensitive: true, whole_word: false, is_regex: false };
-        let opt_ww = SearchOptions { case_sensitive: false, whole_word: true, is_regex: false };
+        let opt_ci = SearchOptions {
+            case_sensitive: false,
+            whole_word: false,
+            is_regex: false,
+        };
+        let opt_cs = SearchOptions {
+            case_sensitive: true,
+            whole_word: false,
+            is_regex: false,
+        };
+        let opt_ww = SearchOptions {
+            case_sensitive: false,
+            whole_word: true,
+            is_regex: false,
+        };
 
         let line = "2026-11-25 [ERROR] Service error occurred";
         assert!(SearchEngine::matches_line(line, "error", &opt_ci));
@@ -268,12 +275,20 @@ mod tests {
 
     #[test]
     fn test_regex_anchors_and_wildcard() {
-        let opt_regex = SearchOptions { case_sensitive: false, whole_word: false, is_regex: true };
+        let opt_regex = SearchOptions {
+            case_sensitive: false,
+            whole_word: false,
+            is_regex: true,
+        };
 
         let line = "2026-11-25 [INFO] Kernel ready";
         assert!(SearchEngine::matches_line(line, r"^2026", &opt_regex));
         assert!(SearchEngine::matches_line(line, r"ready$", &opt_regex));
-        assert!(SearchEngine::matches_line(line, r"\[INFO\].*ready", &opt_regex));
+        assert!(SearchEngine::matches_line(
+            line,
+            r"\[INFO\].*ready",
+            &opt_regex
+        ));
         assert!(!SearchEngine::matches_line(line, r"^Kernel", &opt_regex));
     }
 

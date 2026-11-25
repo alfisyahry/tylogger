@@ -1,8 +1,8 @@
 use std::os::windows::ffi::OsStrExt;
 use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::Graphics::Gdi::{
-    CreateSolidBrush, DeleteObject, FillRect, SelectObject, SetBkMode, SetTextColor, TextOutW,
-    HDC, HGDIOBJ, TRANSPARENT,
+    CreateSolidBrush, DeleteObject, FillRect, SelectObject, SetBkMode, SetTextColor, TextOutW, HDC,
+    HGDIOBJ, TRANSPARENT,
 };
 
 use crate::core::workspace::Document;
@@ -152,9 +152,10 @@ impl LogGrid {
                 let old_font = SelectObject(hdc, font);
                 SetBkMode(hdc, TRANSPARENT as _);
                 SetTextColor(hdc, theme.text_muted.to_colorref());
-                let msg: Vec<u16> = "No log file open. Use File -> Open (Ctrl+O) or Drag & Drop a file here.\0"
-                    .encode_utf16()
-                    .collect();
+                let msg: Vec<u16> =
+                    "No log file open. Use File -> Open (Ctrl+O) or Drag & Drop a file here.\0"
+                        .encode_utf16()
+                        .collect();
                 TextOutW(hdc, 24, 24, msg.as_ptr(), (msg.len() - 1) as _);
                 SelectObject(hdc, old_font);
                 return;
@@ -251,7 +252,13 @@ impl LogGrid {
             let line_num_str = format!("{}", line_idx + 1);
             let wide_num: Vec<u16> = std::ffi::OsStr::new(&line_num_str).encode_wide().collect();
             let num_x = gutter_width - 10 - (wide_num.len() as i32 * char_width);
-            TextOutW(hdc, num_x, y_pos + 2, wide_num.as_ptr(), wide_num.len() as _);
+            TextOutW(
+                hdc,
+                num_x,
+                y_pos + 2,
+                wide_num.as_ptr(),
+                wide_num.len() as _,
+            );
 
             // Line text content
             if let Ok(line_text) = doc.get_line(line_idx) {
@@ -264,12 +271,20 @@ impl LogGrid {
                 SetTextColor(hdc, text_color);
                 let wide_text: Vec<u16> = std::ffi::OsStr::new(&line_text).encode_wide().collect();
                 let text_x = gutter_width + 8 - doc.scroll_x;
-                TextOutW(hdc, text_x, y_pos + 2, wide_text.as_ptr(), wide_text.len() as _);
+                TextOutW(
+                    hdc,
+                    text_x,
+                    y_pos + 2,
+                    wide_text.as_ptr(),
+                    wide_text.len() as _,
+                );
 
                 // Highlight search match if query exists and matches this line
                 if let Some(ref query) = doc.search_query {
                     if !query.is_empty() {
-                        if let Some(match_pos) = line_text.to_lowercase().find(&query.to_lowercase()) {
+                        if let Some(match_pos) =
+                            line_text.to_lowercase().find(&query.to_lowercase())
+                        {
                             let match_x = text_x + (match_pos as i32 * char_width);
                             let match_w = query.len() as i32 * char_width;
                             let match_rect = RECT {
@@ -285,8 +300,15 @@ impl LogGrid {
                             // Redraw matched text in match color
                             SetTextColor(hdc, theme.search_match_fg.to_colorref());
                             let matched_str = &line_text[match_pos..match_pos + query.len()];
-                            let wide_match: Vec<u16> = std::ffi::OsStr::new(matched_str).encode_wide().collect();
-                            TextOutW(hdc, match_x, y_pos + 2, wide_match.as_ptr(), wide_match.len() as _);
+                            let wide_match: Vec<u16> =
+                                std::ffi::OsStr::new(matched_str).encode_wide().collect();
+                            TextOutW(
+                                hdc,
+                                match_x,
+                                y_pos + 2,
+                                wide_match.as_ptr(),
+                                wide_match.len() as _,
+                            );
                         }
                     }
                 }

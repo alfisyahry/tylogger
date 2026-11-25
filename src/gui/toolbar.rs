@@ -32,15 +32,69 @@ impl Default for Toolbar {
 impl Toolbar {
     pub fn new() -> Self {
         let buttons = vec![
-            ToolbarButton { id: ID_FILE_OPEN, label: "Open", width: 56, is_toggle: false, is_active: false },
-            ToolbarButton { id: ID_FILE_RELOAD, label: "Reload", width: 60, is_toggle: false, is_active: false },
-            ToolbarButton { id: ID_FILE_CLOSE, label: "Close", width: 54, is_toggle: false, is_active: false },
-            ToolbarButton { id: ID_SEARCH_FIND, label: "Find", width: 50, is_toggle: false, is_active: false },
-            ToolbarButton { id: ID_FILTER_TOGGLE, label: "Filter", width: 54, is_toggle: false, is_active: false },
-            ToolbarButton { id: ID_TOOLS_BOOKMARK_TOGGLE, label: "Bookmark", width: 74, is_toggle: false, is_active: false },
-            ToolbarButton { id: ID_VIEW_FOLLOW_TAIL, label: "Follow Tail", width: 84, is_toggle: true, is_active: true },
-            ToolbarButton { id: ID_VIEW_PAUSE_MONITORING, label: "Pause", width: 58, is_toggle: true, is_active: false },
-            ToolbarButton { id: ID_TOOLS_SETTINGS, label: "Settings", width: 68, is_toggle: false, is_active: false },
+            ToolbarButton {
+                id: ID_FILE_OPEN,
+                label: "Open",
+                width: 56,
+                is_toggle: false,
+                is_active: false,
+            },
+            ToolbarButton {
+                id: ID_FILE_RELOAD,
+                label: "Reload",
+                width: 60,
+                is_toggle: false,
+                is_active: false,
+            },
+            ToolbarButton {
+                id: ID_FILE_CLOSE,
+                label: "Close",
+                width: 54,
+                is_toggle: false,
+                is_active: false,
+            },
+            ToolbarButton {
+                id: ID_SEARCH_FIND,
+                label: "Find",
+                width: 50,
+                is_toggle: false,
+                is_active: false,
+            },
+            ToolbarButton {
+                id: ID_FILTER_TOGGLE,
+                label: "Filter",
+                width: 54,
+                is_toggle: false,
+                is_active: false,
+            },
+            ToolbarButton {
+                id: ID_TOOLS_BOOKMARK_TOGGLE,
+                label: "Bookmark",
+                width: 74,
+                is_toggle: false,
+                is_active: false,
+            },
+            ToolbarButton {
+                id: ID_VIEW_FOLLOW_TAIL,
+                label: "Follow Tail",
+                width: 84,
+                is_toggle: true,
+                is_active: true,
+            },
+            ToolbarButton {
+                id: ID_VIEW_PAUSE_MONITORING,
+                label: "Pause",
+                width: 58,
+                is_toggle: true,
+                is_active: false,
+            },
+            ToolbarButton {
+                id: ID_TOOLS_SETTINGS,
+                label: "Settings",
+                width: 68,
+                is_toggle: false,
+                is_active: false,
+            },
         ];
         Self { buttons }
     }
@@ -129,13 +183,17 @@ impl Toolbar {
             DeleteObject(f_brush as _);
 
             SetTextColor(hdc, text_color);
-            let wide_label: Vec<u16> = std::ffi::OsStr::new(btn.label)
-                .encode_wide()
-                .collect();
+            let wide_label: Vec<u16> = std::ffi::OsStr::new(btn.label).encode_wide().collect();
             // Center text inside button
             let text_x = curr_x + 8;
             let text_y = 6;
-            TextOutW(hdc, text_x, text_y, wide_label.as_ptr(), wide_label.len() as _);
+            TextOutW(
+                hdc,
+                text_x,
+                text_y,
+                wide_label.as_ptr(),
+                wide_label.len() as _,
+            );
 
             curr_x += btn.width + 6;
         }
