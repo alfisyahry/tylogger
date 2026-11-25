@@ -276,7 +276,8 @@ impl LogGrid {
                 };
 
                 SetTextColor(hdc, text_color);
-                let wide_text: Vec<u16> = std::ffi::OsStr::new(&line_text).encode_wide().collect();
+                let display_str = crate::core::reader::sanitize_for_display(&line_text);
+                let wide_text: Vec<u16> = std::ffi::OsStr::new(&display_str).encode_wide().collect();
                 let text_x = gutter_width + 8 - doc.scroll_x;
                 TextOutW(
                     hdc,

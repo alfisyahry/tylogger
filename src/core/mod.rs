@@ -75,7 +75,7 @@ pub use plugin::{
     DeclarativeColumnizer, ExecutablePluginHost, PluginCategory, PluginIpcMessage, PluginManifest,
     PluginRegistry, PluginTrustState,
 };
-pub use reader::{NonLockingLogReader, UpdateEvent};
+pub use reader::{sanitize_for_display, NonLockingLogReader, UpdateEvent};
 pub use search::{SearchEngine, SearchOptions, SearchResult};
 pub use session::{CrashRecoveryTracker, MissingSourceAction, SessionDocument, SessionState};
 pub use source::{allocate_source_id, LogSource, MockSource, SingleFileSource, SourceLineRef};
