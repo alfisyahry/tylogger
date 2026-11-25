@@ -1,0 +1,28 @@
+[package]
+name = "logexpert-rust"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance native Windows log analysis tool (LogExpert reimplementation)"
+license = "MIT"
+
+[dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Memory",
+    "Win32_UI_Controls",
+    "Win32_System_Threading",
+    "Win32_Security",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_IO",
+] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
