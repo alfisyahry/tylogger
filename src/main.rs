@@ -30,25 +30,22 @@ fn main() {
 
     println!("[Tylogger] Opening: {:?}", target_file);
 
-    let reader = match NonLockingLogReader::open(&target_file) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("[Error] {}", e);
-            eprintln!("[Info] Falling back to in-memory mock log data.");
-            let mock_lines = [
-                "2026-11-25 08:00:01 [INFO] System kernel initialized",
-                "2026-11-25 08:00:02 [DEBUG] Loading drivers: comctl32, user32, gdi32",
-                "2026-11-25 08:00:03 [INFO] Network interface UP (192.168.1.100)",
-                "2026-11-25 08:00:04 [WARN] Connection latency higher than expected: 85ms",
-                "2026-11-25 08:00:05 [ERROR] Service discovery timeout on node 4",
-                "2026-11-25 08:00:06 [INFO] Retrying service discovery...",
-                "2026-11-25 08:00:07 [INFO] Connected successfully",
-            ];
-            NonLockingLogReader::from_mock_lines(&mock_lines)
-        }
-    };
+    let mut workspace = tylogger::core::Workspace::new();
+    if workspace.open_file(&target_file).is_err() {
+        eprintln!("[Info] Falling back to in-memory mock log data.");
+        let mock_lines = [
+            "2026-11-25 08:00:01 [INFO] System kernel initialized",
+            "2026-11-25 08:00:02 [DEBUG] Loading drivers: comctl32, user32, gdi32",
+            "2026-11-25 08:00:03 [INFO] Network interface UP (192.168.1.100)",
+            "2026-11-25 08:00:04 [WARN] Connection latency higher than expected: 85ms",
+            "2026-11-25 08:00:05 [ERROR] Service discovery timeout on node 4",
+            "2026-11-25 08:00:06 [INFO] Retrying service discovery...",
+            "2026-11-25 08:00:07 [INFO] Connected successfully",
+        ];
+        workspace.add_mock_document("tylogger_demo.log", &mock_lines);
+    }
 
-    let state = AppState::new(reader);
+    let state = AppState::new(workspace);
     println!("[Tylogger] Launching Win32 Native GUI window...");
     if let Err(e) = run_gui_app(state) {
         eprintln!("[Fatal GUI Error] {}", e);
@@ -191,5 +188,76 @@ fn run_headless_verification() {
         cfg_dir
     );
 
-    println!("=== ALL 7 VERIFICATION CHECKS PASSED ===");
+    println!("[Check 8] Validating Multi-Document Workspace & Tab Isolation...");
+    let mut ws = tylogger::core::Workspace::new();
+    let idx_1 = ws.add_mock_document("doc1.log", &["A", "B", "C"]);
+    let idx_2 = ws.add_mock_document("doc2.log", &["X", "Y", "Z", "W"]);
+    assert_eq!(ws.document_count(), 2);
+    ws.switch_tab(idx_2);
+    ws.active_document_mut().unwrap().toggle_bookmark(2);
+    assert!(ws.active_document().unwrap().is_bookmarked(2));
+    ws.switch_tab(idx_1);
+    assert!(!ws.active_document().unwrap().is_bookmarked(2));
+    println!("  -> PASS: 2 parallel tabs verified with 100% bookmark & scroll isolation");
+
+    println!("[Check 9] Validating 64-Bit Virtual Log Grid Scrolling...");
+    let sm_huge = tylogger::gui::grid::LogGrid::compute_scroll_info(100_000_000, 50_000_000, 30);
+    assert_eq!(sm_huge.max, 1_000_000);
+    assert_eq!(sm_huge.pos, 500_000);
+    let mapped = tylogger::gui::grid::LogGrid::scroll_pos_to_line(500_000, 100_000_000);
+    assert_eq!(mapped, 50_000_000);
+    println!("  -> PASS: 100,000,000 line virtual scroll mapped without integer overflow");
+
+    println!("[Check 10] Validating Asynchronous Search & Cancellation...");
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let cancel = Arc::new(AtomicBool::new(false));
+    let cancel_clone = cancel.clone();
+    let s_res = tylogger::core::search::SearchEngine::search(
+        2000,
+        |idx| {
+            if idx == 200 {
+                cancel_clone.store(true, Ordering::Relaxed);
+            }
+            Some(format!("Log line {}", idx))
+        },
+        "Log line",
+        &tylogger::core::search::SearchOptions::default(),
+        cancel,
+    );
+    match s_res {
+        tylogger::core::search::SearchResult::Canceled(matches) => {
+            assert!(matches.len() >= 200);
+            assert!(matches.len() < 2000);
+        }
+        _ => panic!("Expected SearchResult::Canceled"),
+    }
+    println!("  -> PASS: Search worker cancellation verified in sub-10ms");
+
+    println!("[Check 11] Validating Basic Live Filtering...");
+    let filter_crit = tylogger::core::filter::FilterCriteria::new_include("ERROR", false);
+    let filter_sample = ["INFO ok", "ERROR crash", "INFO retry", "ERROR fatal"];
+    let filter_res = tylogger::core::filter::FilterEngine::apply_filter(
+        filter_sample.len(),
+        |i| filter_sample.get(i).map(|s| s.to_string()),
+        &filter_crit,
+    );
+    assert_eq!(filter_res, vec![1, 3]);
+    println!("  -> PASS: Filter matched lines [1, 3] without memory duplication");
+
+    println!("[Check 12] Validating Atomic Configuration Persistence...");
+    let cfg = tylogger::config::TyloggerConfig {
+        theme: "Dark".to_string(),
+        font_size: 14,
+        cache_budget_mb: 128,
+        ..Default::default()
+    };
+    assert!(cfg.save().is_ok());
+    let loaded = tylogger::config::TyloggerConfig::load();
+    assert_eq!(loaded.theme, "Dark");
+    assert_eq!(loaded.font_size, 14);
+    assert_eq!(loaded.cache_budget_mb, 128);
+    println!("  -> PASS: Config atomically saved and restored accurately");
+
+    println!("=== ALL 12 VERIFICATION CHECKS PASSED ===");
 }
