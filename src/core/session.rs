@@ -675,7 +675,7 @@ mod tests {
         assert_eq!(restored.documents.len(), 2);
         assert_eq!(restored.documents[0].bookmarks, vec![5, 42, 100]);
         assert_eq!(restored.documents[0].timeshift_offset_nanos, 1_500_000_000);
-        assert_eq!(restored.split_view_active, true);
+        assert!(restored.split_view_active);
         assert_eq!(
             restored.documents[1].filter_pattern,
             Some("ERROR".to_string())
@@ -716,7 +716,7 @@ mod tests {
         assert_eq!(migrated.schema_version, "1.0");
         assert_eq!(migrated.documents.len(), 1);
         // Default safe values populated
-        assert_eq!(migrated.split_view_active, false);
+        assert!(!migrated.split_view_active);
         assert_eq!(migrated.documents[0].timeshift_offset_nanos, 0);
         assert_eq!(migrated.documents[0].sync_group_id, None);
         assert_eq!(migrated.documents[0].bookmarks, vec![10, 20]);
@@ -740,7 +740,7 @@ mod tests {
         let migrated = SessionState::from_json(v2_json).expect("Migrate v2.0 session");
         assert_eq!(migrated.workspace_name, "Phase 5 Session");
         assert_eq!(migrated.schema_version, "2.0");
-        assert_eq!(migrated.analytics_workspace_open, false);
+        assert!(!migrated.analytics_workspace_open);
         assert_eq!(migrated.active_analytics_query, None);
         assert_eq!(migrated.analytics_preset_id, None);
     }

@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::core::analytics::bucket::{BucketInterval, SparseTimeBucketer};
     use crate::core::analytics::cardinality::{CountMinSketch, HyperLogLog, SpaceSavingTopK};

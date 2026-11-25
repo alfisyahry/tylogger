@@ -5,7 +5,7 @@ pub mod zip;
 mod tests;
 
 pub use gzip::{
-    decompress_gzip, inflate_deflate, GzipLogReader, TempFileGuard, MAX_COMPRESSION_RATIO,
-    MAX_UNCOMPRESSED_SIZE,
+    check_zip_bomb, decompress_gzip, inflate_deflate, GzipLogReader, TempFileGuard,
+    MAX_COMPRESSION_RATIO, MAX_UNCOMPRESSED_SIZE,
 };
 pub use zip::{validate_safe_zip_entry_path, ZipArchiveReader, ZipMember};

@@ -6,8 +6,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 /// Displays the official About Tylogger dialog.
 pub fn show_about_dialog(hwnd: HWND) {
     let title: Vec<u16> = "About Tylogger\0".encode_utf16().collect();
-    let message = "Tylogger — High-Performance Native Log Analysis Tool\n\
-        Version 0.3.0 (Phase 3 Advanced Log Processing)\n\
+    let message = "Tylogger — High-Performance Native Windows Log Analysis Tool\n\
+        Version 0.8.0 (Phase 8 Complete Feature Parity, Functional Audit & Hardening)\n\
         Target: Windows 7 SP1 through Windows 11 (x86 & x64)\n\n\
         Architecture: Win32 native GDI / 64-bit sparse index engine\n\
         MultiFile Rotated Log Management | Modular Columnizers\n\
@@ -15,7 +15,7 @@ pub fn show_about_dialog(hwnd: HWND) {
         Zero CLR/.NET dependency | Zero browser/WebView runtime\n\n\
         Copyright (c) 2026 Tylogger Contributors.\n\
         Based on LogExpert architecture (MIT License).\n\
-        Upstream commit: a147ed316cca14f4d90a41186079a116f91ef9ee\0"
+        Upstream pinned commit: a147ed316cca14f4d90a41186079a116f91ef9ee\0"
         .to_string();
     let msg_wide: Vec<u16> = message.encode_utf16().collect();
 

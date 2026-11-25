@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::core::source::LogSource;
     use crate::core::stream::command::{validate_safe_argument, StreamTemplate};

@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use std::sync::Arc;
     use tempfile_crate_replacement::create_test_dir;

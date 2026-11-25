@@ -182,11 +182,13 @@ mod tests {
 
     #[test]
     fn test_config_serialization_and_parsing() {
-        let mut original = TyloggerConfig::default();
-        original.theme = "Dark".to_string();
-        original.font_size = 15;
-        original.cache_budget_mb = 128;
-        original.follow_tail_default = false;
+        let original = TyloggerConfig {
+            theme: "Dark".to_string(),
+            font_size: 15,
+            cache_budget_mb: 128,
+            follow_tail_default: false,
+            ..Default::default()
+        };
 
         let json = original.to_json();
         let parsed = TyloggerConfig::parse_json(&json).expect("Parse JSON");

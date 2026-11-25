@@ -97,8 +97,8 @@ pub use trigger::{
 pub use workspace::{Document, Workspace};
 
 pub use archive::{
-    decompress_gzip, inflate_deflate, validate_safe_zip_entry_path, GzipLogReader, TempFileGuard,
-    ZipArchiveReader, ZipMember,
+    check_zip_bomb, decompress_gzip, inflate_deflate, validate_safe_zip_entry_path, GzipLogReader,
+    TempFileGuard, ZipArchiveReader, ZipMember,
 };
 pub use legacy::{
     LegacyExternalToolDef, LegacyFilterPreset, LegacyHighlightRule, LegacyImportSummary,

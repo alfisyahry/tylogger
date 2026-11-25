@@ -351,6 +351,69 @@ impl LogSource for SingleFileSource {
     }
 }
 
+impl LogSource for NonLockingLogReader {
+    fn source_id(&self) -> u32 {
+        0
+    }
+
+    fn generation(&self) -> u64 {
+        1
+    }
+
+    fn display_name(&self) -> &str {
+        "NonLockingLogReader"
+    }
+
+    fn source_path(&self) -> Option<&Path> {
+        None
+    }
+
+    fn line_count(&self) -> usize {
+        self.line_count()
+    }
+
+    fn file_size(&self) -> u64 {
+        self.file_size()
+    }
+
+    fn get_line(&mut self, idx: usize) -> Result<String, String> {
+        self.get_line(idx)
+    }
+
+    fn get_line_ref(&self, idx: usize) -> SourceLineRef {
+        SourceLineRef {
+            source_id: 0,
+            generation: 1,
+            line_idx: idx,
+            byte_offset: 0,
+        }
+    }
+
+    fn check_for_updates(&mut self) -> Result<UpdateEvent, String> {
+        self.check_for_updates()
+    }
+
+    fn capabilities(&self) -> SourceCapabilities {
+        SourceCapabilities::default()
+    }
+
+    fn source_type(&self) -> SourceType {
+        SourceType::LocalFile
+    }
+
+    fn toggle_bookmark(&mut self, idx: usize) -> bool {
+        self.toggle_bookmark(idx)
+    }
+
+    fn is_bookmarked(&self, idx: usize) -> bool {
+        self.is_bookmarked(idx)
+    }
+
+    fn bookmarks(&self) -> &[usize] {
+        self.bookmarks()
+    }
+}
+
 /// In-memory mock source for unit testing and headless validation.
 pub struct MockSource {
     id: u32,
