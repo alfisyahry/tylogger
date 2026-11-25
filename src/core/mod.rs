@@ -13,6 +13,7 @@ pub mod filter;
 pub mod filter_tab;
 pub mod highlight;
 pub mod inspector;
+pub mod largefile;
 pub mod legacy;
 pub mod memory;
 pub mod merge;
@@ -62,6 +63,7 @@ pub use filter::{
 pub use filter_tab::FilteredDocumentSource;
 pub use highlight::{HighlightGroup, HighlightRule};
 pub use inspector::{InspectedRecord, InspectorField, LogInspector};
+pub use largefile::{create_64bit_boundary_test_file, generate_deterministic_record};
 pub use memory::{format_safe_preview_line, GlobalMemoryBudget, MemoryProfile};
 pub use merge::{
     BoundedKWayMerger, LiveLogMergeEngine, LiveMergeMetrics, MergeCandidate, MergedLogSource,
