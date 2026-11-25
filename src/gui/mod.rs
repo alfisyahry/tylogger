@@ -2,6 +2,8 @@ pub mod commands;
 pub mod grid;
 pub mod markerbar;
 pub mod menu;
+pub mod panels;
+pub mod searchbar;
 pub mod statusbar;
 pub mod tabstrip;
 pub mod theme;
