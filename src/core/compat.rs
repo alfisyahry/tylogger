@@ -1,3 +1,5 @@
+#![allow(clippy::manual_c_str_literals)]
+
 use std::ptr::null_mut;
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE, WAIT_OBJECT_0};
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress, LoadLibraryA};
@@ -21,7 +23,9 @@ impl Win32SyncEvent {
         if handle == INVALID_HANDLE_VALUE || handle.is_null() {
             return Err("Failed to create Win32 synchronization event".to_string());
         }
-        Ok(Self { event_handle: handle })
+        Ok(Self {
+            event_handle: handle,
+        })
     }
 
     pub fn set(&self) -> bool {
@@ -60,12 +64,8 @@ pub fn fill_secure_random(buf: &mut [u8]) -> Result<(), String> {
         if !bcrypt_handle.is_null() {
             let func = GetProcAddress(bcrypt_handle, b"BCryptGenRandom\0".as_ptr());
             if let Some(proc) = func {
-                type BCryptGenRandomFn = unsafe extern "system" fn(
-                    *mut std::ffi::c_void,
-                    *mut u8,
-                    u32,
-                    u32,
-                ) -> i32;
+                type BCryptGenRandomFn =
+                    unsafe extern "system" fn(*mut std::ffi::c_void, *mut u8, u32, u32) -> i32;
                 let bcrypt_gen: BCryptGenRandomFn = std::mem::transmute(proc);
                 // BCRYPT_USE_SYSTEM_PREFERRED_RNG = 0x00000002
                 let status = bcrypt_gen(null_mut(), buf.as_mut_ptr(), buf.len() as u32, 0x00000002);
@@ -91,13 +91,8 @@ pub fn fill_secure_random(buf: &mut [u8]) -> Result<(), String> {
             let rel_fn = GetProcAddress(advapi_handle, b"CryptReleaseContext\0".as_ptr());
 
             if let (Some(acq), Some(gen), Some(rel)) = (acq_fn, gen_fn, rel_fn) {
-                type CryptAcqFn = unsafe extern "system" fn(
-                    *mut usize,
-                    *const u16,
-                    *const u16,
-                    u32,
-                    u32,
-                ) -> i32;
+                type CryptAcqFn =
+                    unsafe extern "system" fn(*mut usize, *const u16, *const u16, u32, u32) -> i32;
                 type CryptGenFn = unsafe extern "system" fn(usize, u32, *mut u8) -> i32;
                 type CryptRelFn = unsafe extern "system" fn(usize, u32) -> i32;
 

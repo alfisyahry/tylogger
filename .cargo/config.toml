@@ -1,6 +1,7 @@
 [build]
 rustflags = [
     "-C", "target-feature=+crt-static",
+    "-C", "link-arg=/ENTRY:mainCRTStartup",
     "-C", "link-arg=/DELAYLOAD:api-ms-win-core-synch-l1-2-0.dll",
     "-C", "link-arg=/DELAYLOAD:bcryptprimitives.dll",
     "-C", "link-arg=delayimp.lib",
@@ -12,6 +13,7 @@ rustflags = [
 [target.i686-pc-windows-msvc]
 rustflags = [
     "-C", "target-feature=+crt-static",
+    "-C", "link-arg=/ENTRY:mainCRTStartup",
     "-C", "link-arg=/DELAYLOAD:api-ms-win-core-synch-l1-2-0.dll",
     "-C", "link-arg=/DELAYLOAD:bcryptprimitives.dll",
     "-C", "link-arg=delayimp.lib",
@@ -24,6 +26,7 @@ rustflags = [
 [target.x86_64-pc-windows-msvc]
 rustflags = [
     "-C", "target-feature=+crt-static",
+    "-C", "link-arg=/ENTRY:mainCRTStartup",
     "-C", "link-arg=/DELAYLOAD:api-ms-win-core-synch-l1-2-0.dll",
     "-C", "link-arg=/DELAYLOAD:bcryptprimitives.dll",
     "-C", "link-arg=delayimp.lib",

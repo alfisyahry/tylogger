@@ -713,14 +713,16 @@ impl Drop for NonLockingLogReader {
 
 /// Sanitizes embedded NUL and destructive control characters for safe Win32 GDI display (AG-22, RSK-21).
 pub fn sanitize_for_display(raw: &str) -> String {
-    if !raw.contains('\0') && !raw.chars().any(|c| c.is_control() && c != '\t' && c != '\r' && c != '\n') {
+    if !raw.contains('\0')
+        && !raw
+            .chars()
+            .any(|c| c.is_control() && c != '\t' && c != '\r' && c != '\n')
+    {
         return raw.to_string();
     }
     raw.chars()
         .map(|c| {
-            if c == '\0' {
-                ' '
-            } else if c.is_control() && c != '\t' && c != '\r' && c != '\n' {
+            if c == '\0' || (c.is_control() && c != '\t' && c != '\r' && c != '\n') {
                 ' '
             } else {
                 c
@@ -894,7 +896,8 @@ mod tests {
             f.write_all(b"Normal Line 1\n").unwrap();
             f.write_all(b"Embedded\0Nul\0Bytes\n").unwrap();
             f.write_all(b"\n\n").unwrap(); // Empty lines
-            f.write_all(b"Malformed JSON: {\"key\": unquoted_value\n").unwrap();
+            f.write_all(b"Malformed JSON: {\"key\": unquoted_value\n")
+                .unwrap();
             f.write_all(b"EOF Line Without Newline").unwrap(); // No trailing \n
         }
 

@@ -3,8 +3,8 @@ pub mod anomaly;
 pub mod archive;
 pub mod bookmark;
 pub mod columnizer;
-pub mod compat;
 pub mod compare;
+pub mod compat;
 pub mod correlation;
 pub mod custom_columnizer;
 pub mod domain;
@@ -35,9 +35,9 @@ pub mod trigger;
 pub mod workspace;
 
 #[cfg(test)]
-mod leak_tests;
-#[cfg(test)]
 mod ingestion_test;
+#[cfg(test)]
+mod leak_tests;
 #[cfg(test)]
 mod soak_test;
 
@@ -59,6 +59,10 @@ pub use pattern::{DynamicTokenizer, PatternGrouper, PatternTemplate};
 
 pub use bookmark::{Bookmark, BookmarkStatus, GlobalBookmarkManager};
 pub use columnizer::{Columnizer, ColumnizerRegistry};
+pub use compat::{
+    enforce_safe_dll_search_order, fill_secure_random, verify_delay_load_runtime_safety,
+    Win32SyncEvent,
+};
 pub use correlation::{
     CorrelationCandidate, CorrelationEngine, CorrelationRule, CorrelationTargetRecord, MatchReason,
 };
@@ -103,10 +107,6 @@ pub use tools::{
 pub use trigger::{
     ActionHistoryEntry, BoundedActionHistory, BoundedActionQueue, GlobalTriggerDeduplicator,
     KeywordTriggerRule, QueuedAction, TriggerAction, TriggerEngine, TriggerExecutionKey,
-};
-pub use compat::{
-    enforce_safe_dll_search_order, fill_secure_random, verify_delay_load_runtime_safety,
-    Win32SyncEvent,
 };
 pub use workspace::{Document, Workspace};
 

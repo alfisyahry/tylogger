@@ -36,8 +36,14 @@ pub fn create_64bit_boundary_test_file(path: &Path) -> std::io::Result<u64> {
         .open(path)?;
 
     // 1. Write header records near 0 offset
-    writeln!(file, "2026-11-25 00:00:00.000 [INFO] System Initialized at offset 0")?;
-    writeln!(file, "2026-11-25 00:00:01.000 [INFO] Sparse 64-bit boundary testing begins")?;
+    writeln!(
+        file,
+        "2026-11-25 00:00:00.000 [INFO] System Initialized at offset 0"
+    )?;
+    writeln!(
+        file,
+        "2026-11-25 00:00:01.000 [INFO] Sparse 64-bit boundary testing begins"
+    )?;
 
     // 2. Seek across 2^32 boundary (4GB + 1024 bytes)
     let target_offset = BOUNDARY_4GB + 1024;
@@ -76,10 +82,17 @@ mod tests {
     #[test]
     fn test_64bit_boundary_file_and_sparse_reader() {
         let temp_dir = std::env::temp_dir();
-        let test_file = temp_dir.join(format!("tylogger_64bit_boundary_{}.log", std::process::id()));
+        let test_file = temp_dir.join(format!(
+            "tylogger_64bit_boundary_{}.log",
+            std::process::id()
+        ));
 
-        let file_size = create_64bit_boundary_test_file(&test_file).expect("Create 64-bit boundary file");
-        assert!(file_size > BOUNDARY_4GB, "File size must cross 4GB boundary");
+        let file_size =
+            create_64bit_boundary_test_file(&test_file).expect("Create 64-bit boundary file");
+        assert!(
+            file_size > BOUNDARY_4GB,
+            "File size must cross 4GB boundary"
+        );
 
         let mut reader = NonLockingLogReader::open(&test_file).expect("Open 64-bit reader");
         assert!(reader.file_size() > BOUNDARY_4GB);

@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
+    use crate::core::reader::{NonLockingLogReader, UpdateEvent};
     use std::fs::OpenOptions;
     use std::io::Write;
     use std::time::{Duration, Instant};
-    use crate::core::reader::{NonLockingLogReader, UpdateEvent};
 
     #[derive(Debug)]
     #[allow(dead_code)]
@@ -41,8 +41,7 @@ mod tests {
                 writeln!(
                     appender,
                     "2026-11-25 12:00:00.000 [INFO] [SoakTail] Cycle {} entry #{}",
-                    cycle,
-                    j
+                    cycle, j
                 )
                 .unwrap();
                 appends_count += 1;

@@ -187,7 +187,7 @@ impl LogSource for FilteredDocumentSource {
                 };
 
                 // Narrowed chunk size (128) guarantees critical section duration < 2ms (AG-20, RSK-19)
-        const CHUNK_SIZE: usize = 128;
+                const CHUNK_SIZE: usize = 128;
                 let mut chunk_start = 0;
                 let mut chunk_buf: Vec<Option<String>> = Vec::new();
                 let parent_clone = Arc::clone(&self.parent_source);

@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
+    use crate::core::reader::{NonLockingLogReader, UpdateEvent};
     use std::fs::OpenOptions;
     use std::io::Write;
     use std::time::Instant;
-    use crate::core::reader::{NonLockingLogReader, UpdateEvent};
 
     #[test]
     fn test_high_volume_synthetic_ingestion() {
@@ -41,7 +41,9 @@ mod tests {
         appender.flush().unwrap();
 
         let elapsed = start.elapsed();
-        let update = reader.check_for_updates().expect("Check for appended updates");
+        let update = reader
+            .check_for_updates()
+            .expect("Check for appended updates");
         match update {
             UpdateEvent::Appended { new_lines } => {
                 assert_eq!(new_lines, total_burst_lines);
@@ -62,6 +64,10 @@ mod tests {
 
         // Ingestion rate throughput check (> 1,000 lines/sec)
         let lines_per_sec = (total_burst_lines as f64) / elapsed.as_secs_f64().max(0.001);
-        assert!(lines_per_sec >= 1000.0, "Throughput must exceed 1000 lines/sec (actual: {:.1})", lines_per_sec);
+        assert!(
+            lines_per_sec >= 1000.0,
+            "Throughput must exceed 1000 lines/sec (actual: {:.1})",
+            lines_per_sec
+        );
     }
 }

@@ -27,7 +27,12 @@ impl BoundedStreamStorage {
     pub const DEFAULT_MAX_STREAM_BYTES: usize = 64 * 1024 * 1024; // 64 MB
 
     pub fn new(profile_id: &str, template_name: &str, max_memory_lines: usize) -> Self {
-        Self::with_byte_budget(profile_id, template_name, max_memory_lines, Self::DEFAULT_MAX_STREAM_BYTES)
+        Self::with_byte_budget(
+            profile_id,
+            template_name,
+            max_memory_lines,
+            Self::DEFAULT_MAX_STREAM_BYTES,
+        )
     }
 
     pub fn with_byte_budget(
@@ -57,7 +62,8 @@ impl BoundedStreamStorage {
         self.max_memory_bytes = max_bytes.max(1);
         while self.current_memory_bytes > self.max_memory_bytes && !self.ring_buffer.is_empty() {
             if let Some(removed) = self.ring_buffer.pop_front() {
-                self.current_memory_bytes = self.current_memory_bytes.saturating_sub(removed.len() + 1);
+                self.current_memory_bytes =
+                    self.current_memory_bytes.saturating_sub(removed.len() + 1);
                 self.history_evicted = true;
                 self.bookmarks.retain(|&idx| idx > 0);
                 for b in self.bookmarks.iter_mut() {
@@ -86,7 +92,8 @@ impl BoundedStreamStorage {
                 || self.current_memory_bytes + line_len > self.max_memory_bytes)
         {
             if let Some(removed) = self.ring_buffer.pop_front() {
-                self.current_memory_bytes = self.current_memory_bytes.saturating_sub(removed.len() + 1);
+                self.current_memory_bytes =
+                    self.current_memory_bytes.saturating_sub(removed.len() + 1);
                 self.history_evicted = true;
                 // Adjust bookmarks on eviction
                 self.bookmarks.retain(|&idx| idx > 0);
