@@ -34,6 +34,9 @@ pub mod tools;
 pub mod trigger;
 pub mod workspace;
 
+#[cfg(test)]
+mod leak_tests;
+
 pub use analytics::{
     AggregateField, AggregationResult, AggregationType, AnalyticsEngine, AnalyticsPreset,
     AnalyticsQuery, BucketInterval, BucketStats, CountMinSketch, EvaluationMode, FilterCondition,
