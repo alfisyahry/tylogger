@@ -238,7 +238,7 @@ unsafe extern "system" fn wnd_proc(
         WM_CREATE => {
             let cs = lparam as *const CREATESTRUCTW;
             let state_ptr = (*cs).lpCreateParams as *mut AppState;
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, state_ptr as isize);
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, state_ptr as _);
 
             // Install Native Menu Bar
             let menu = create_main_menu();
