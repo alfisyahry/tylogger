@@ -676,24 +676,6 @@ impl NonLockingLogReader {
         Ok(line_text)
     }
 
-/// Sanitizes embedded NUL and destructive control characters for safe Win32 GDI display (AG-22, RSK-21).
-pub fn sanitize_for_display(raw: &str) -> String {
-    if !raw.contains('\0') && !raw.chars().any(|c| c.is_control() && c != '\t' && c != '\r' && c != '\n') {
-        return raw.to_string();
-    }
-    raw.chars()
-        .map(|c| {
-            if c == '\0' {
-                ' '
-            } else if c.is_control() && c != '\t' && c != '\r' && c != '\n' {
-                ' '
-            } else {
-                c
-            }
-        })
-        .collect()
-}
-
     /// Sets cache capacity and byte budget.
     pub fn set_cache_budget(&mut self, max_entries: usize, max_bytes: usize) {
         self.cache.set_budget(max_entries, max_bytes);
@@ -727,6 +709,24 @@ impl Drop for NonLockingLogReader {
             }
         }
     }
+}
+
+/// Sanitizes embedded NUL and destructive control characters for safe Win32 GDI display (AG-22, RSK-21).
+pub fn sanitize_for_display(raw: &str) -> String {
+    if !raw.contains('\0') && !raw.chars().any(|c| c.is_control() && c != '\t' && c != '\r' && c != '\n') {
+        return raw.to_string();
+    }
+    raw.chars()
+        .map(|c| {
+            if c == '\0' {
+                ' '
+            } else if c.is_control() && c != '\t' && c != '\r' && c != '\n' {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

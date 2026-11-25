@@ -104,35 +104,70 @@ impl DamerauLevenshtein {
             return n;
         }
 
-        // Bounded 3-row sliding matrix: row2 (i-2), row1 (i-1), row0 (i)
-        let mut d_prev2 = vec![0usize; m + 1];
-        let mut d_prev1: Vec<usize> = (0..=m).collect();
-        let mut d_curr = vec![0usize; m + 1];
+        // Zero-allocation stack buffers for queries <= 64 characters (AG-13, AG-29)
+        if m <= 64 {
+            let mut d_prev2 = [0usize; 65];
+            let mut d_prev1 = [0usize; 65];
+            for (idx, slot) in d_prev1.iter_mut().enumerate().take(m + 1) {
+                *slot = idx;
+            }
+            let mut d_curr = [0usize; 65];
 
-        for i in 1..=n {
-            d_curr[0] = i;
+            for i in 1..=n {
+                d_curr[0] = i;
 
-            for j in 1..=m {
-                let cost = if s1[i - 1] == s2[j - 1] { 0 } else { 1 };
+                for j in 1..=m {
+                    let cost = if s1[i - 1] == s2[j - 1] { 0 } else { 1 };
 
-                // 1. Deletion, 2. Insertion, 3. Substitution
-                let mut min_val = (d_prev1[j] + 1)
-                    .min(d_curr[j - 1] + 1)
-                    .min(d_prev1[j - 1] + cost);
+                    // 1. Deletion, 2. Insertion, 3. Substitution
+                    let mut min_val = (d_prev1[j] + 1)
+                        .min(d_curr[j - 1] + 1)
+                        .min(d_prev1[j - 1] + cost);
 
-                // 4. Adjacent Transposition
-                if i > 1 && j > 1 && s1[i - 1] == s2[j - 2] && s1[i - 2] == s2[j - 1] {
-                    min_val = min_val.min(d_prev2[j - 2] + 1);
+                    // 4. Adjacent Transposition
+                    if i > 1 && j > 1 && s1[i - 1] == s2[j - 2] && s1[i - 2] == s2[j - 1] {
+                        min_val = min_val.min(d_prev2[j - 2] + 1);
+                    }
+
+                    d_curr[j] = min_val;
                 }
 
-                d_curr[j] = min_val;
+                d_prev2[..=m].copy_from_slice(&d_prev1[..=m]);
+                d_prev1[..=m].copy_from_slice(&d_curr[..=m]);
             }
 
-            d_prev2.copy_from_slice(&d_prev1);
-            d_prev1.copy_from_slice(&d_curr);
-        }
+            d_curr[m]
+        } else {
+            // Bounded 3-row sliding matrix: row2 (i-2), row1 (i-1), row0 (i)
+            let mut d_prev2 = vec![0usize; m + 1];
+            let mut d_prev1: Vec<usize> = (0..=m).collect();
+            let mut d_curr = vec![0usize; m + 1];
 
-        d_curr[m]
+            for i in 1..=n {
+                d_curr[0] = i;
+
+                for j in 1..=m {
+                    let cost = if s1[i - 1] == s2[j - 1] { 0 } else { 1 };
+
+                    // 1. Deletion, 2. Insertion, 3. Substitution
+                    let mut min_val = (d_prev1[j] + 1)
+                        .min(d_curr[j - 1] + 1)
+                        .min(d_prev1[j - 1] + cost);
+
+                    // 4. Adjacent Transposition
+                    if i > 1 && j > 1 && s1[i - 1] == s2[j - 2] && s1[i - 2] == s2[j - 1] {
+                        min_val = min_val.min(d_prev2[j - 2] + 1);
+                    }
+
+                    d_curr[j] = min_val;
+                }
+
+                d_prev2.copy_from_slice(&d_prev1);
+                d_prev1.copy_from_slice(&d_curr);
+            }
+
+            d_curr[m]
+        }
     }
 
     /// Evaluates whether any token or substring in `haystack` matches `term`
