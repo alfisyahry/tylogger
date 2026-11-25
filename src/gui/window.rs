@@ -10,7 +10,7 @@ use windows_sys::Win32::Graphics::Gdi::{
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Controls::SetScrollInfo;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    VK_B, VK_DOWN, VK_END, VK_F2, VK_HOME, VK_NEXT, VK_PRIOR, VK_T, VK_UP,
+    VK_B, VK_DOWN, VK_END, VK_F2, VK_F7, VK_HOME, VK_NEXT, VK_PRIOR, VK_T, VK_UP,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetClientRect, GetMessageW, GetScrollInfo,
@@ -22,7 +22,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WNDCLASSW, WS_OVERLAPPEDWINDOW, WS_VSCROLL,
 };
 
+use crate::config::WINDOW_CLASS_NAME;
 use crate::core::{NonLockingLogReader, UpdateEvent};
+use crate::gui::theme::ThemeMode;
 
 pub struct AppState {
     pub reader: NonLockingLogReader,
@@ -32,6 +34,7 @@ pub struct AppState {
     pub font: HGDIOBJ,
     pub follow_tail: bool,
     pub selected_line: usize,
+    pub theme_mode: ThemeMode,
 }
 
 impl AppState {
@@ -44,6 +47,7 @@ impl AppState {
             font: null_mut(),
             follow_tail: true,
             selected_line: 0,
+            theme_mode: ThemeMode::Light,
         }
     }
 }
@@ -51,7 +55,7 @@ impl AppState {
 pub fn run_gui_app(mut state: AppState) -> Result<(), String> {
     unsafe {
         let instance = GetModuleHandleW(null_mut());
-        let class_name: Vec<u16> = "TyloggerWindowClass\0".encode_utf16().collect();
+        let class_name: Vec<u16> = format!("{}\0", WINDOW_CLASS_NAME).encode_utf16().collect();
         let title: Vec<u16> = "Tylogger\0".encode_utf16().collect();
 
         let wc = WNDCLASSW {
@@ -235,10 +239,14 @@ unsafe extern "system" fn wnd_proc(
 
                 if key == VK_UP {
                     state.top_line = state.top_line.saturating_sub(1);
+                    state.selected_line = state.selected_line.saturating_sub(1);
                     state.follow_tail = false;
                 } else if key == VK_DOWN {
                     if state.top_line + state.visible_lines < total {
                         state.top_line += 1;
+                    }
+                    if state.selected_line + 1 < total {
+                        state.selected_line += 1;
                     }
                 } else if key == VK_PRIOR {
                     state.top_line = state.top_line.saturating_sub(state.visible_lines);
@@ -248,9 +256,11 @@ unsafe extern "system" fn wnd_proc(
                         .min(total.saturating_sub(state.visible_lines));
                 } else if key == VK_HOME {
                     state.top_line = 0;
+                    state.selected_line = 0;
                     state.follow_tail = false;
                 } else if key == VK_END {
                     state.top_line = total.saturating_sub(state.visible_lines);
+                    state.selected_line = total.saturating_sub(1);
                     state.follow_tail = true;
                 } else if key == VK_T {
                     state.follow_tail = !state.follow_tail;
@@ -258,15 +268,19 @@ unsafe extern "system" fn wnd_proc(
                         state.top_line = total.saturating_sub(state.visible_lines);
                     }
                 } else if key == VK_B {
-                    let target = state.top_line;
+                    let target = state.selected_line;
                     state.reader.toggle_bookmark(target);
                 } else if key == VK_F2 {
                     // Jump to next bookmark
                     let curr = state.top_line;
                     if let Some(&next_bm) = state.reader.bookmarks().iter().find(|&&b| b > curr) {
                         state.top_line = next_bm;
+                        state.selected_line = next_bm;
                         state.follow_tail = false;
                     }
+                } else if key == VK_F7 {
+                    // Cycle theme (Light -> Dark -> Soft Dark)
+                    state.theme_mode = state.theme_mode.cycle();
                 }
 
                 update_scroll_info(hwnd, state);
@@ -292,6 +306,7 @@ unsafe extern "system" fn wnd_proc(
                         }
                         UpdateEvent::Truncated => {
                             state.top_line = 0;
+                            state.selected_line = 0;
                             update_scroll_info(hwnd, state);
                             update_title(hwnd, state);
                             InvalidateRect(hwnd, null_mut(), 0);
@@ -313,7 +328,9 @@ unsafe extern "system" fn wnd_proc(
             let hdc = BeginPaint(hwnd, &mut ps);
 
             if !state_ptr.is_null() {
-                let state = &*state_ptr;
+                let state = &mut *state_ptr;
+                let tokens = state.theme_mode.tokens();
+
                 let mut rect: RECT = std::mem::zeroed();
                 GetClientRect(hwnd, &mut rect);
                 let width = rect.right - rect.left;
@@ -324,10 +341,33 @@ unsafe extern "system" fn wnd_proc(
                 let mem_bmp = CreateCompatibleBitmap(hdc, width, height);
                 let old_bmp = SelectObject(mem_dc, mem_bmp as HGDIOBJ);
 
-                // Background
-                let bg_brush = CreateSolidBrush(0x00FFFFFF);
+                // Background (surface.primary)
+                let bg_brush = CreateSolidBrush(tokens.surface_primary.to_colorref());
                 FillRect(mem_dc, &rect, bg_brush);
                 DeleteObject(bg_brush as HGDIOBJ);
+
+                // Gutter background
+                let gutter_width = 72;
+                let gutter_rect = RECT {
+                    left: 0,
+                    top: 0,
+                    right: gutter_width,
+                    bottom: height,
+                };
+                let gutter_brush = CreateSolidBrush(tokens.row_gutter.to_colorref());
+                FillRect(mem_dc, &gutter_rect, gutter_brush);
+                DeleteObject(gutter_brush as HGDIOBJ);
+
+                // Gutter divider (border.subtle)
+                let border_rect = RECT {
+                    left: gutter_width - 1,
+                    top: 0,
+                    right: gutter_width,
+                    bottom: height,
+                };
+                let border_brush = CreateSolidBrush(tokens.border_subtle.to_colorref());
+                FillRect(mem_dc, &border_rect, border_brush);
+                DeleteObject(border_brush as HGDIOBJ);
 
                 let old_font = if !state.font.is_null() {
                     SelectObject(mem_dc, state.font)
@@ -345,27 +385,74 @@ unsafe extern "system" fn wnd_proc(
                     }
 
                     let y = (i as i32) * state.line_height;
+                    let is_selected = line_idx == state.selected_line;
                     let is_bm = state.reader.is_bookmarked(line_idx);
 
-                    // Bookmark star + Line number
-                    let num_str = format!("{:>6} {}", line_idx + 1, if is_bm { "*" } else { " " });
-                    let wide_num: Vec<u16> = num_str.encode_utf16().collect();
-                    SetTextColor(mem_dc, if is_bm { 0x000000D0 } else { 0x00808080 });
-                    TextOutW(mem_dc, 8, y, wide_num.as_ptr(), wide_num.len() as i32);
+                    // Row background: selection or alternate
+                    if is_selected {
+                        let sel_rect = RECT {
+                            left: gutter_width,
+                            top: y,
+                            right: width,
+                            bottom: y + state.line_height,
+                        };
+                        let sel_brush = CreateSolidBrush(tokens.selection_bg.to_colorref());
+                        FillRect(mem_dc, &sel_rect, sel_brush);
+                        DeleteObject(sel_brush as HGDIOBJ);
+                    } else if line_idx % 2 == 1 {
+                        let alt_rect = RECT {
+                            left: gutter_width,
+                            top: y,
+                            right: width,
+                            bottom: y + state.line_height,
+                        };
+                        let alt_brush = CreateSolidBrush(tokens.row_alternate.to_colorref());
+                        FillRect(mem_dc, &alt_rect, alt_brush);
+                        DeleteObject(alt_brush as HGDIOBJ);
+                    }
 
-                    // Line content
+                    // Bookmark star in gutter
+                    if is_bm {
+                        SetTextColor(mem_dc, tokens.accent_primary.to_colorref());
+                        let star: Vec<u16> = "*\0".encode_utf16().collect();
+                        TextOutW(mem_dc, 6, y, star.as_ptr(), 1);
+                    }
+
+                    // Line number
+                    let num_str = format!("{:>6}", line_idx + 1);
+                    let wide_num: Vec<u16> = num_str.encode_utf16().collect();
+                    SetTextColor(mem_dc, tokens.text_muted.to_colorref());
+                    TextOutW(mem_dc, 16, y, wide_num.as_ptr(), wide_num.len() as i32);
+
+                    // Line content with semantic severity coloring
                     if let Ok(line_text) = state.reader.get_line(line_idx) {
-                        let wide_text: Vec<u16> = line_text.encode_utf16().collect();
-                        let text_color =
-                            if line_text.contains("ERROR") || line_text.contains("FATAL") {
-                                0x002020D0 // Red
-                            } else if line_text.contains("WARN") {
-                                0x000080D0 // Orange/Amber
-                            } else {
-                                0x00101010 // Dark gray/black
-                            };
+                        let text_color = if is_selected {
+                            tokens.selection_fg.to_colorref()
+                        } else if line_text.contains("CRITICAL") || line_text.contains("FATAL") {
+                            tokens.severity_critical.fg.to_colorref()
+                        } else if line_text.contains("ERROR") {
+                            tokens.severity_error.fg.to_colorref()
+                        } else if line_text.contains("WARN") {
+                            tokens.severity_warning.fg.to_colorref()
+                        } else if line_text.contains("NOTICE") {
+                            tokens.severity_notice.fg.to_colorref()
+                        } else if line_text.contains("INFO") || line_text.contains("SUCCESS") {
+                            tokens.severity_info.fg.to_colorref()
+                        } else if line_text.contains("DEBUG") || line_text.contains("TRACE") {
+                            tokens.severity_trace.fg.to_colorref()
+                        } else {
+                            tokens.text_primary.to_colorref()
+                        };
+
                         SetTextColor(mem_dc, text_color);
-                        TextOutW(mem_dc, 80, y, wide_text.as_ptr(), wide_text.len() as i32);
+                        let wide_text: Vec<u16> = line_text.encode_utf16().collect();
+                        TextOutW(
+                            mem_dc,
+                            gutter_width + 8,
+                            y,
+                            wide_text.as_ptr(),
+                            wide_text.len() as i32,
+                        );
                     }
                 }
 
@@ -412,7 +499,8 @@ unsafe fn update_scroll_info(hwnd: HWND, state: &AppState) {
 
 unsafe fn update_title(hwnd: HWND, state: &AppState) {
     let title_str = format!(
-        "Tylogger - Lines: {} | Pos: {} | Tail: {} | Bookmarks: {}\0",
+        "Tylogger [{}] - Lines: {} | Pos: {} | Tail: {} | Bookmarks: {}\0",
+        state.theme_mode.name(),
         state.reader.line_count(),
         state.top_line + 1,
         if state.follow_tail { "ON" } else { "OFF" },

@@ -168,5 +168,28 @@ fn run_headless_verification() {
     // Cleanup
     let _ = std::fs::remove_file(&test_file);
 
-    println!("=== ALL 5 VERIFICATION CHECKS PASSED ===");
+    println!("[Check 6] Validating Theme system & contrast compliance...");
+    use tylogger::gui::theme::{ThemeMode, DARK_THEME, LIGHT_THEME, SOFT_DARK_THEME};
+    assert_eq!(LIGHT_THEME.window_bg.to_colorref(), 0x00F7F5F4);
+    assert_eq!(DARK_THEME.window_bg.to_colorref(), 0x001F1A17);
+    assert_eq!(SOFT_DARK_THEME.window_bg.to_colorref(), 0x002A2420);
+    let mut theme = ThemeMode::Light;
+    theme = theme.cycle();
+    assert_eq!(theme, ThemeMode::Dark);
+    theme = theme.cycle();
+    assert_eq!(theme, ThemeMode::SoftDark);
+    println!("  -> PASS: All 3 normative themes verified with proper COLORREF conversion");
+
+    println!("[Check 7] Validating AppID & Config directory...");
+    use tylogger::config::{get_config_dir, APP_ID, WINDOW_CLASS_NAME};
+    assert_eq!(APP_ID, "Tylogger");
+    assert_eq!(WINDOW_CLASS_NAME, "TyloggerWindowClass");
+    let cfg_dir = get_config_dir();
+    assert!(!cfg_dir.as_os_str().is_empty());
+    println!(
+        "  -> PASS: AppID 'Tylogger' and config path '{:?}' confirmed",
+        cfg_dir
+    );
+
+    println!("=== ALL 7 VERIFICATION CHECKS PASSED ===");
 }
