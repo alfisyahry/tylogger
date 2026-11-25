@@ -1,8 +1,8 @@
 [package]
-name = "logexpert-rust"
+name = "tylogger"
 version = "0.1.0"
 edition = "2021"
-description = "High-performance native Windows log analysis tool (LogExpert reimplementation)"
+description = "High-performance native Windows log analysis tool (Tylogger)"
 license = "MIT"
 
 [dependencies]

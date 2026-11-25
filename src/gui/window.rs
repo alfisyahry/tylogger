@@ -1,14 +1,11 @@
 use std::ffi::c_void;
 use std::ptr::null_mut;
-use windows_sys::Win32::Foundation::{
-    HWND, LPARAM, LRESULT, RECT, WPARAM,
-};
+use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
-    BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateFontW,
-    CreateSolidBrush, DeleteDC, DeleteObject, EndPaint, FillRect, GetDC,
-    GetTextMetricsW, InvalidateRect, ReleaseDC, SelectObject, SetBkMode,
-    SetTextColor, TextOutW, UpdateWindow, COLOR_WINDOW, HGDIOBJ, OUT_DEFAULT_PRECIS,
-    PAINTSTRUCT, SRCCOPY, TEXTMETRICW, TRANSPARENT, VARIABLE_PITCH,
+    BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateFontW, CreateSolidBrush,
+    DeleteDC, DeleteObject, EndPaint, FillRect, GetDC, GetTextMetricsW, InvalidateRect, ReleaseDC,
+    SelectObject, SetBkMode, SetTextColor, TextOutW, UpdateWindow, COLOR_WINDOW, HGDIOBJ,
+    OUT_DEFAULT_PRECIS, PAINTSTRUCT, SRCCOPY, TEXTMETRICW, TRANSPARENT, VARIABLE_PITCH,
 };
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::Controls::SetScrollInfo;
@@ -16,14 +13,13 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     VK_B, VK_DOWN, VK_END, VK_F2, VK_HOME, VK_NEXT, VK_PRIOR, VK_T, VK_UP,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetClientRect, GetMessageW,
-    GetScrollInfo, GetWindowLongPtrW, KillTimer, PostQuitMessage, RegisterClassW,
-    SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage,
-    CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, GWLP_USERDATA,
-    SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK,
-    SB_VERT, SCROLLINFO, SIF_ALL, SIF_PAGE, SIF_POS, SIF_RANGE, SW_SHOW, WM_CREATE,
-    WM_DESTROY, WM_ERASEBKGND, WM_KEYDOWN, WM_MOUSEWHEEL, WM_PAINT, WM_SIZE,
-    WM_TIMER, WM_VSCROLL, WNDCLASSW, WS_OVERLAPPEDWINDOW, WS_VSCROLL,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetClientRect, GetMessageW, GetScrollInfo,
+    GetWindowLongPtrW, KillTimer, PostQuitMessage, RegisterClassW, SetTimer, SetWindowLongPtrW,
+    SetWindowTextW, ShowWindow, TranslateMessage, CREATESTRUCTW, CS_HREDRAW, CS_VREDRAW,
+    CW_USEDEFAULT, GWLP_USERDATA, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION,
+    SB_THUMBTRACK, SB_VERT, SCROLLINFO, SIF_ALL, SIF_PAGE, SIF_POS, SIF_RANGE, SW_SHOW, WM_CREATE,
+    WM_DESTROY, WM_ERASEBKGND, WM_KEYDOWN, WM_MOUSEWHEEL, WM_PAINT, WM_SIZE, WM_TIMER, WM_VSCROLL,
+    WNDCLASSW, WS_OVERLAPPEDWINDOW, WS_VSCROLL,
 };
 
 use crate::core::{NonLockingLogReader, UpdateEvent};
@@ -55,8 +51,8 @@ impl AppState {
 pub fn run_gui_app(mut state: AppState) -> Result<(), String> {
     unsafe {
         let instance = GetModuleHandleW(null_mut());
-        let class_name: Vec<u16> = "LogExpertRustClass\0".encode_utf16().collect();
-        let title: Vec<u16> = "LogExpert (Rust Native Win32)\0".encode_utf16().collect();
+        let class_name: Vec<u16> = "TyloggerWindowClass\0".encode_utf16().collect();
+        let title: Vec<u16> = "Tylogger\0".encode_utf16().collect();
 
         let wc = WNDCLASSW {
             style: CS_HREDRAW | CS_VREDRAW,
@@ -90,7 +86,7 @@ pub fn run_gui_app(mut state: AppState) -> Result<(), String> {
             state_ptr as *const c_void,
         );
 
-        if hwnd == null_mut() {
+        if hwnd.is_null() {
             return Err("Failed to create Win32 main window".to_string());
         }
 
@@ -191,7 +187,8 @@ unsafe extern "system" fn wnd_proc(
                     state.top_line = state.top_line.saturating_sub(state.visible_lines);
                     state.follow_tail = false;
                 } else if code == SB_PAGEDOWN {
-                    state.top_line = (state.top_line + state.visible_lines).min(total.saturating_sub(state.visible_lines));
+                    state.top_line = (state.top_line + state.visible_lines)
+                        .min(total.saturating_sub(state.visible_lines));
                 } else if code == SB_THUMBTRACK || code == SB_THUMBPOSITION {
                     let mut si: SCROLLINFO = std::mem::zeroed();
                     si.cbSize = std::mem::size_of::<SCROLLINFO>() as u32;
@@ -212,14 +209,15 @@ unsafe extern "system" fn wnd_proc(
             if !state_ptr.is_null() {
                 let state = &mut *state_ptr;
                 let delta = (wparam >> 16) as i16;
-                let lines_to_scroll = (delta / 40).abs() as usize;
+                let lines_to_scroll = (delta / 40).unsigned_abs() as usize;
                 let total = state.reader.line_count();
 
                 if delta > 0 {
                     state.top_line = state.top_line.saturating_sub(lines_to_scroll);
                     state.follow_tail = false;
                 } else if state.top_line + state.visible_lines < total {
-                    state.top_line = (state.top_line + lines_to_scroll).min(total.saturating_sub(state.visible_lines));
+                    state.top_line = (state.top_line + lines_to_scroll)
+                        .min(total.saturating_sub(state.visible_lines));
                 }
 
                 update_scroll_info(hwnd, state);
@@ -246,7 +244,8 @@ unsafe extern "system" fn wnd_proc(
                     state.top_line = state.top_line.saturating_sub(state.visible_lines);
                     state.follow_tail = false;
                 } else if key == VK_NEXT {
-                    state.top_line = (state.top_line + state.visible_lines).min(total.saturating_sub(state.visible_lines));
+                    state.top_line = (state.top_line + state.visible_lines)
+                        .min(total.saturating_sub(state.visible_lines));
                 } else if key == VK_HOME {
                     state.top_line = 0;
                     state.follow_tail = false;
@@ -357,13 +356,14 @@ unsafe extern "system" fn wnd_proc(
                     // Line content
                     if let Ok(line_text) = state.reader.get_line(line_idx) {
                         let wide_text: Vec<u16> = line_text.encode_utf16().collect();
-                        let text_color = if line_text.contains("ERROR") || line_text.contains("FATAL") {
-                            0x002020D0 // Red
-                        } else if line_text.contains("WARN") {
-                            0x000080D0 // Orange/Amber
-                        } else {
-                            0x00101010 // Dark gray/black
-                        };
+                        let text_color =
+                            if line_text.contains("ERROR") || line_text.contains("FATAL") {
+                                0x002020D0 // Red
+                            } else if line_text.contains("WARN") {
+                                0x000080D0 // Orange/Amber
+                            } else {
+                                0x00101010 // Dark gray/black
+                            };
                         SetTextColor(mem_dc, text_color);
                         TextOutW(mem_dc, 80, y, wide_text.as_ptr(), wide_text.len() as i32);
                     }
@@ -381,16 +381,14 @@ unsafe extern "system" fn wnd_proc(
                 DeleteDC(mem_dc);
             }
 
-            EndPaint(hwnd, &mut ps);
+            EndPaint(hwnd, &ps);
             0
         }
 
         WM_DESTROY => {
             KillTimer(hwnd, 1);
-            if !state_ptr.is_null() {
-                if !(*state_ptr).font.is_null() {
-                    DeleteObject((*state_ptr).font);
-                }
+            if !state_ptr.is_null() && !(*state_ptr).font.is_null() {
+                DeleteObject((*state_ptr).font);
             }
             PostQuitMessage(0);
             0
@@ -414,7 +412,7 @@ unsafe fn update_scroll_info(hwnd: HWND, state: &AppState) {
 
 unsafe fn update_title(hwnd: HWND, state: &AppState) {
     let title_str = format!(
-        "LogExpert (Rust Native Win32) - Lines: {} | Pos: {} | Tail: {} | Bookmarks: {}\0",
+        "Tylogger - Lines: {} | Pos: {} | Tail: {} | Bookmarks: {}\0",
         state.reader.line_count(),
         state.top_line + 1,
         if state.follow_tail { "ON" } else { "OFF" },

@@ -1,8 +1,8 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use logexpert_rust::core::NonLockingLogReader;
-use logexpert_rust::gui::window::{run_gui_app, AppState};
+use tylogger::core::NonLockingLogReader;
+use tylogger::gui::window::{run_gui_app, AppState};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -23,12 +23,12 @@ fn main() {
     } else {
         // Create a default sample log file for demonstration
         let temp_dir = env::temp_dir();
-        let sample_path = temp_dir.join("logexpert_demo.log");
+        let sample_path = temp_dir.join("tylogger_demo.log");
         create_sample_log(&sample_path);
         sample_path
     };
 
-    println!("[LogExpert Rust] Opening: {:?}", target_file);
+    println!("[Tylogger] Opening: {:?}", target_file);
 
     let reader = match NonLockingLogReader::open(&target_file) {
         Ok(r) => r,
@@ -49,23 +49,23 @@ fn main() {
     };
 
     let state = AppState::new(reader);
-    println!("[LogExpert Rust] Launching Win32 Native GUI window...");
+    println!("[Tylogger] Launching Win32 Native GUI window...");
     if let Err(e) = run_gui_app(state) {
         eprintln!("[Fatal GUI Error] {}", e);
     }
 }
 
 fn print_usage() {
-    println!("LogExpert Rust - Native Windows Log Analysis Tool (Win7 SP1 to Win11)");
+    println!("Tylogger - Native Windows Log Analysis Tool (Win7 SP1 to Win11)");
     println!("Usage:");
-    println!("  logexpert-rust.exe [OPTIONS] [LOGFILE]");
+    println!("  tylogger.exe [OPTIONS] [LOGFILE]");
     println!();
     println!("Options:");
     println!("  --headless-test   Run headless automated validation suite (no GUI loop)");
     println!("  --help, -h        Display this help message");
 }
 
-fn create_sample_log(path: &std::path::Path) {
+fn create_sample_log(path: &Path) {
     use std::io::Write;
     let mut f = match std::fs::File::create(path) {
         Ok(file) => file,
@@ -73,7 +73,7 @@ fn create_sample_log(path: &std::path::Path) {
     };
 
     let sample_data = [
-        "2026-11-25 08:00:01.102 [INFO] [CoreEngine] Starting LogExpert Rust Native subsystem...",
+        "2026-11-25 08:00:01.102 [INFO] [CoreEngine] Starting Tylogger Native subsystem...",
         "2026-11-25 08:00:01.150 [INFO] [Config] Loaded user preferences from local profile",
         "2026-11-25 08:00:01.210 [DEBUG] [Win32] Verified Windows 7 SP1+ compatible subsystem (NT 6.1+)",
         "2026-11-25 08:00:01.305 [DEBUG] [GDI] Double-buffered rendering context allocated successfully",
@@ -92,23 +92,32 @@ fn create_sample_log(path: &std::path::Path) {
 }
 
 fn run_headless_verification() {
-    println!("=== LOGEXPERT RUST HEADLESS VERIFICATION SUITE ===");
+    println!("=== TYLOGGER HEADLESS VERIFICATION SUITE ===");
     let temp_dir = env::temp_dir();
-    let test_file = temp_dir.join(format!("logexpert_headless_{}.log", std::process::id()));
+    let test_file = temp_dir.join(format!("tylogger_headless_{}.log", std::process::id()));
 
     // 1. Initial write
     {
         use std::io::Write;
         let mut f = std::fs::File::create(&test_file).expect("Create test file");
         for i in 1..=1000 {
-            writeln!(f, "2026-11-25 08:00:{:02} [INFO] Line {} log message payload", i % 60, i).unwrap();
+            writeln!(
+                f,
+                "2026-11-25 08:00:{:02} [INFO] Line {} log message payload",
+                i % 60,
+                i
+            )
+            .unwrap();
         }
     }
 
     println!("[Check 1] Opening file in non-locking mode...");
     let mut reader = NonLockingLogReader::open(&test_file).expect("Open reader");
     assert_eq!(reader.line_count(), 1000, "Initial line count must match");
-    println!("  -> PASS: Indexed 1000 lines successfully. File size: {} bytes", reader.file_size());
+    println!(
+        "  -> PASS: Indexed 1000 lines successfully. File size: {} bytes",
+        reader.file_size()
+    );
 
     println!("[Check 2] Validating line retrieval & content integrity...");
     let line_0 = reader.get_line(0).expect("Get line 0");
@@ -127,13 +136,19 @@ fn run_headless_verification() {
     println!("[Check 4] Testing concurrent append (Tailing simulation)...");
     {
         use std::io::Write;
-        let mut f = std::fs::OpenOptions::new().append(true).open(&test_file).expect("Append file");
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&test_file)
+            .expect("Append file");
         for i in 1001..=1500 {
             writeln!(f, "2026-11-25 08:01:00 [DEBUG] Appended line {} data", i).unwrap();
         }
     }
     let update_ev = reader.check_for_updates().expect("Update check");
-    assert_eq!(update_ev, logexpert_rust::core::reader::UpdateEvent::Appended { new_lines: 500 });
+    assert_eq!(
+        update_ev,
+        tylogger::core::reader::UpdateEvent::Appended { new_lines: 500 }
+    );
     assert_eq!(reader.line_count(), 1500);
     println!("  -> PASS: Detected 500 appended lines without file sharing violation");
 
@@ -144,7 +159,7 @@ fn run_headless_verification() {
         writeln!(f, "2026-11-25 08:02:00 [INFO] Rotated log head").unwrap();
     }
     let update_ev = reader.check_for_updates().expect("Truncate check");
-    assert_eq!(update_ev, logexpert_rust::core::reader::UpdateEvent::Truncated);
+    assert_eq!(update_ev, tylogger::core::reader::UpdateEvent::Truncated);
     assert_eq!(reader.line_count(), 1);
     let rot_line = reader.get_line(0).expect("Read rotated line");
     assert_eq!(rot_line, "2026-11-25 08:02:00 [INFO] Rotated log head");

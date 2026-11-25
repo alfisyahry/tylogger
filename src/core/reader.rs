@@ -1,11 +1,9 @@
 use std::path::Path;
 use std::ptr::null_mut;
-use windows_sys::Win32::Foundation::{
-    CloseHandle, GENERIC_READ, HANDLE, INVALID_HANDLE_VALUE,
-};
+use windows_sys::Win32::Foundation::{CloseHandle, GENERIC_READ, HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, GetFileSizeEx, ReadFile, SetFilePointerEx, FILE_ATTRIBUTE_NORMAL,
-    FILE_BEGIN, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+    CreateFileW, GetFileSizeEx, ReadFile, SetFilePointerEx, FILE_ATTRIBUTE_NORMAL, FILE_BEGIN,
+    FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
 
 /// File update event returned by `check_for_updates`
@@ -177,8 +175,8 @@ impl NonLockingLogReader {
                 break;
             }
 
-            for i in 0..bytes_read as usize {
-                if buffer[i] == b'\n' {
+            for (i, &byte) in buffer.iter().enumerate().take(bytes_read as usize) {
+                if byte == b'\n' {
                     let next_line_start = current_offset + (i as u64) + 1;
                     if next_line_start < to_offset {
                         self.line_offsets.push(next_line_start);
@@ -231,7 +229,11 @@ impl NonLockingLogReader {
     /// Retrieves a single line's text by line index.
     pub fn get_line(&self, index: usize) -> Result<String, String> {
         if index >= self.line_offsets.len() {
-            return Err(format!("Line index {} out of bounds (count: {})", index, self.line_offsets.len()));
+            return Err(format!(
+                "Line index {} out of bounds (count: {})",
+                index,
+                self.line_offsets.len()
+            ));
         }
 
         if self.handle == INVALID_HANDLE_VALUE {
@@ -294,9 +296,8 @@ impl NonLockingLogReader {
 
     fn seek(&self, offset: u64) -> Result<(), String> {
         let mut new_pos: i64 = 0;
-        let success = unsafe {
-            SetFilePointerEx(self.handle, offset as i64, &mut new_pos, FILE_BEGIN)
-        };
+        let success =
+            unsafe { SetFilePointerEx(self.handle, offset as i64, &mut new_pos, FILE_BEGIN) };
         if success == 0 {
             return Err(format!("Failed to seek to offset {}", offset));
         }
@@ -306,7 +307,7 @@ impl NonLockingLogReader {
 
 impl Drop for NonLockingLogReader {
     fn drop(&mut self) {
-        if self.handle != INVALID_HANDLE_VALUE && self.handle != std::ptr::null_mut() {
+        if self.handle != INVALID_HANDLE_VALUE && !self.handle.is_null() {
             unsafe {
                 CloseHandle(self.handle);
             }
@@ -323,7 +324,11 @@ mod tests {
 
     #[test]
     fn test_mock_reader() {
-        let lines = ["Line 1: system init", "Line 2: debug trace", "Line 3: error"];
+        let lines = [
+            "Line 1: system init",
+            "Line 2: debug trace",
+            "Line 3: error",
+        ];
         let mut reader = NonLockingLogReader::from_mock_lines(&lines);
         assert_eq!(reader.line_count(), 3);
         assert!(!reader.is_bookmarked(1));
@@ -349,19 +354,31 @@ mod tests {
         // 2. Open with NonLockingLogReader
         let mut reader = NonLockingLogReader::open(&test_file).unwrap();
         assert_eq!(reader.line_count(), 3);
-        assert_eq!(reader.get_line(0).unwrap(), "2026-11-25 08:00:01 [INFO] Service started");
-        assert_eq!(reader.get_line(2).unwrap(), "2026-11-25 08:00:03 [WARN] Low disk space");
+        assert_eq!(
+            reader.get_line(0).unwrap(),
+            "2026-11-25 08:00:01 [INFO] Service started"
+        );
+        assert_eq!(
+            reader.get_line(2).unwrap(),
+            "2026-11-25 08:00:03 [WARN] Low disk space"
+        );
 
         // 3. Append lines from another writer without locking issues
         {
-            let mut f = std::fs::OpenOptions::new().append(true).open(&test_file).unwrap();
+            let mut f = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&test_file)
+                .unwrap();
             writeln!(f, "2026-11-25 08:00:04 [ERROR] Disk full alert").unwrap();
         }
 
         let event = reader.check_for_updates().unwrap();
         assert_eq!(event, UpdateEvent::Appended { new_lines: 1 });
         assert_eq!(reader.line_count(), 4);
-        assert_eq!(reader.get_line(3).unwrap(), "2026-11-25 08:00:04 [ERROR] Disk full alert");
+        assert_eq!(
+            reader.get_line(3).unwrap(),
+            "2026-11-25 08:00:04 [ERROR] Disk full alert"
+        );
 
         // 4. Simulate file truncation (rotation)
         {
@@ -372,7 +389,10 @@ mod tests {
         let event = reader.check_for_updates().unwrap();
         assert_eq!(event, UpdateEvent::Truncated);
         assert_eq!(reader.line_count(), 1);
-        assert_eq!(reader.get_line(0).unwrap(), "2026-11-25 08:01:00 [INFO] Rotated log");
+        assert_eq!(
+            reader.get_line(0).unwrap(),
+            "2026-11-25 08:01:00 [INFO] Rotated log"
+        );
 
         // Cleanup
         let _ = std::fs::remove_file(&test_file);
