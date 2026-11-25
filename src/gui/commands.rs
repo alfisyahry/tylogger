@@ -7,6 +7,7 @@ pub const ID_FILE_OPEN_MULTI: u16 = 1002;
 pub const ID_FILE_RELOAD: u16 = 1003;
 pub const ID_FILE_CLOSE: u16 = 1004;
 pub const ID_FILE_EXIT: u16 = 1005;
+pub const ID_FILE_EXPORT: u16 = 1006;
 
 pub const ID_EDIT_COPY: u16 = 1010;
 pub const ID_EDIT_SELECT_ALL: u16 = 1011;
@@ -17,6 +18,9 @@ pub const ID_VIEW_PAUSE_MONITORING: u16 = 1022;
 pub const ID_VIEW_ZOOM_IN: u16 = 1023;
 pub const ID_VIEW_ZOOM_OUT: u16 = 1024;
 pub const ID_VIEW_ZOOM_RESET: u16 = 1025;
+pub const ID_VIEW_INSPECTOR_PANEL: u16 = 1026;
+pub const ID_VIEW_NEXT_BOUNDARY: u16 = 1027;
+pub const ID_VIEW_PREV_BOUNDARY: u16 = 1028;
 
 pub const ID_SEARCH_FIND: u16 = 1030;
 pub const ID_SEARCH_FIND_NEXT: u16 = 1031;
@@ -25,12 +29,19 @@ pub const ID_SEARCH_CANCEL: u16 = 1033;
 
 pub const ID_FILTER_TOGGLE: u16 = 1040;
 pub const ID_FILTER_CLEAR: u16 = 1041;
+pub const ID_FILTER_CREATE_TAB: u16 = 1042;
 
 pub const ID_TOOLS_BOOKMARK_TOGGLE: u16 = 1050;
 pub const ID_TOOLS_BOOKMARK_NEXT: u16 = 1051;
 pub const ID_TOOLS_BOOKMARK_PREV: u16 = 1052;
 pub const ID_TOOLS_JUMP_LINE: u16 = 1053;
 pub const ID_TOOLS_SETTINGS: u16 = 1054;
+pub const ID_TOOLS_HIGHLIGHT_RULES: u16 = 1055;
+pub const ID_TOOLS_HIGHLIGHT_NEXT: u16 = 1056;
+pub const ID_TOOLS_HIGHLIGHT_PREV: u16 = 1057;
+
+pub const ID_VIEW_COLUMNIZER_SELECT: u16 = 1070;
+pub const ID_VIEW_CUSTOM_BUILDER: u16 = 1071;
 
 pub const ID_HELP_ABOUT: u16 = 1060;
 

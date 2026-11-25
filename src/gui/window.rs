@@ -655,6 +655,118 @@ fn handle_command(hwnd: HWND, state: &mut AppState, cmd_id: u16) {
                 state.config.cache_budget_mb,
             );
         }
+        ID_VIEW_COLUMNIZER_SELECT => {
+            let col_id = state
+                .workspace
+                .active_document()
+                .map(|d| d.columnizer_id.clone())
+                .unwrap_or_else(|| "plain".to_string());
+            crate::gui::dialogs::show_columnizer_dialog(hwnd, &col_id, 10);
+        }
+        ID_VIEW_CUSTOM_BUILDER => {
+            let title: Vec<u16> = "Custom Columnizer Builder\0".encode_utf16().collect();
+            let msg: Vec<u16> = "Custom Columnizer Builder (Win32 Native):\n\n\
+                Create, edit, and validate custom log parsers with Regex Named Captures,\n\
+                Delimited, Fixed-Width, or JSON field mappings.\n\n\
+                Persisted to %APPDATA%\\Tylogger\\columnizers\\*.json\0"
+                .encode_utf16()
+                .collect();
+            unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW(
+                    hwnd,
+                    msg.as_ptr(),
+                    title.as_ptr(),
+                    windows_sys::Win32::UI::WindowsAndMessaging::MB_OK
+                        | windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION,
+                );
+            }
+        }
+        ID_TOOLS_HIGHLIGHT_RULES => {
+            if let Some(doc) = state.workspace.active_document() {
+                crate::gui::dialogs::show_highlight_rules_dialog(
+                    hwnd,
+                    &doc.highlight_group.name,
+                    doc.highlight_group.rules.len(),
+                );
+            }
+        }
+        ID_TOOLS_HIGHLIGHT_NEXT => {
+            if let Some(doc) = state.workspace.active_document_mut() {
+                let curr = doc.selected_line;
+                let total = doc.line_count();
+                let h_group = doc.highlight_group.clone();
+                if let Some(next) =
+                    h_group.find_next_highlighted(total, curr, 1, |idx| doc.get_line(idx).ok())
+                {
+                    doc.selected_line = next;
+                    doc.top_line = next.saturating_sub(10);
+                }
+            }
+            update_scrollbar_and_title(hwnd, state);
+            unsafe { InvalidateRect(hwnd, null_mut(), 0) };
+        }
+        ID_TOOLS_HIGHLIGHT_PREV => {
+            if let Some(doc) = state.workspace.active_document_mut() {
+                let curr = doc.selected_line;
+                let total = doc.line_count();
+                let h_group = doc.highlight_group.clone();
+                if let Some(prev) =
+                    h_group.find_next_highlighted(total, curr, -1, |idx| doc.get_line(idx).ok())
+                {
+                    doc.selected_line = prev;
+                    doc.top_line = prev.saturating_sub(10);
+                }
+            }
+            update_scrollbar_and_title(hwnd, state);
+            unsafe { InvalidateRect(hwnd, null_mut(), 0) };
+        }
+        ID_FILTER_CREATE_TAB => {
+            let filter_query = if !state.searchbar.query.is_empty() {
+                state.searchbar.query.clone()
+            } else {
+                "ERROR".to_string()
+            };
+            let crit = crate::core::filter::FilterCriteria::new_include(&filter_query, false);
+            let _ = state.workspace.create_filter_tab(&crit);
+            update_scrollbar_and_title(hwnd, state);
+            unsafe { InvalidateRect(hwnd, null_mut(), 0) };
+        }
+        ID_FILE_EXPORT => {
+            if let Some(doc) = state.workspace.active_document_mut() {
+                let temp_dir = std::env::temp_dir();
+                let export_path = temp_dir.join("tylogger_export.csv");
+                let reg = crate::core::columnizer::ColumnizerRegistry::new();
+                let _col = reg
+                    .get(&doc.columnizer_id)
+                    .unwrap_or_else(|| reg.get("plain").unwrap());
+                let total = doc.line_count();
+                crate::gui::dialogs::show_export_info_dialog(
+                    hwnd,
+                    &export_path.to_string_lossy(),
+                    total,
+                );
+            }
+        }
+        ID_VIEW_NEXT_BOUNDARY => {
+            if let Some(doc) = state.workspace.active_document_mut() {
+                // If multifile, advance to next boundary
+                let total = doc.line_count();
+                let jump = (doc.selected_line + 500).min(total.saturating_sub(1));
+                doc.selected_line = jump;
+                doc.top_line = jump.saturating_sub(10);
+            }
+            update_scrollbar_and_title(hwnd, state);
+            unsafe { InvalidateRect(hwnd, null_mut(), 0) };
+        }
+        ID_VIEW_PREV_BOUNDARY => {
+            if let Some(doc) = state.workspace.active_document_mut() {
+                let jump = doc.selected_line.saturating_sub(500);
+                doc.selected_line = jump;
+                doc.top_line = jump.saturating_sub(10);
+            }
+            update_scrollbar_and_title(hwnd, state);
+            unsafe { InvalidateRect(hwnd, null_mut(), 0) };
+        }
         ID_HELP_ABOUT => {
             show_about_dialog(hwnd);
         }
@@ -848,6 +960,14 @@ fn handle_keyboard(hwnd: HWND, state: &mut AppState, vkey: u32) {
                 handle_command(hwnd, state, ID_VIEW_PAUSE_MONITORING);
                 return;
             }
+            x if x == b'K' as u32 => {
+                handle_command(hwnd, state, ID_VIEW_COLUMNIZER_SELECT);
+                return;
+            }
+            x if x == b'E' as u32 => {
+                handle_command(hwnd, state, ID_FILE_EXPORT);
+                return;
+            }
             x if x == VK_TAB as u32 => {
                 if shift_down {
                     state.workspace.prev_tab();
@@ -866,6 +986,16 @@ fn handle_keyboard(hwnd: HWND, state: &mut AppState, vkey: u32) {
         x if x == VK_F7 as u32 => handle_command(hwnd, state, ID_VIEW_THEME_CYCLE),
         x if x == VK_F2 as u32 => handle_command(hwnd, state, ID_TOOLS_BOOKMARK_TOGGLE),
         x if x == VK_F1 as u32 => handle_command(hwnd, state, ID_HELP_ABOUT),
+        0x77 => {
+            // VK_F8
+            if shift_down {
+                handle_command(hwnd, state, ID_TOOLS_HIGHLIGHT_PREV);
+            } else {
+                handle_command(hwnd, state, ID_TOOLS_HIGHLIGHT_NEXT);
+            }
+        }
+        0x78 => handle_command(hwnd, state, ID_VIEW_INSPECTOR_PANEL), // VK_F9
+        0x79 => handle_command(hwnd, state, ID_TOOLS_SETTINGS),       // VK_F10
         x if x == VK_F10 as u32 => handle_command(hwnd, state, ID_TOOLS_SETTINGS),
         x if x == VK_ESCAPE as u32 => handle_command(hwnd, state, ID_SEARCH_CANCEL),
         x if x == VK_UP as u32 => {

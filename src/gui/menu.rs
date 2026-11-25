@@ -38,6 +38,12 @@ pub fn create_main_menu() -> HMENU {
             ID_FILE_RELOAD as usize,
             to_wide("&Reload\tF5").as_ptr(),
         );
+        AppendMenuW(
+            file_menu,
+            MF_STRING,
+            ID_FILE_EXPORT as usize,
+            to_wide("&Export...\tCtrl+E").as_ptr(),
+        );
         AppendMenuW(file_menu, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(
             file_menu,
@@ -99,26 +105,39 @@ pub fn create_main_menu() -> HMENU {
             view_menu,
             MF_STRING,
             ID_VIEW_PAUSE_MONITORING as usize,
-            to_wide("&Pause Monitoring\tCtrl+P").as_ptr(),
+            to_wide("&Pause Monitoring\tCtrl+Space").as_ptr(),
         );
         AppendMenuW(view_menu, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(
             view_menu,
             MF_STRING,
-            ID_VIEW_ZOOM_IN as usize,
-            to_wide("Zoom &In\tCtrl++").as_ptr(),
+            ID_VIEW_COLUMNIZER_SELECT as usize,
+            to_wide("Choose &Columnizer...\tCtrl+K").as_ptr(),
         );
         AppendMenuW(
             view_menu,
             MF_STRING,
-            ID_VIEW_ZOOM_OUT as usize,
-            to_wide("Zoom &Out\tCtrl+-").as_ptr(),
+            ID_VIEW_CUSTOM_BUILDER as usize,
+            to_wide("Custom Columnizer &Builder...\tCtrl+Shift+K").as_ptr(),
         );
         AppendMenuW(
             view_menu,
             MF_STRING,
-            ID_VIEW_ZOOM_RESET as usize,
-            to_wide("&Reset Zoom\tCtrl+0").as_ptr(),
+            ID_VIEW_INSPECTOR_PANEL as usize,
+            to_wide("Toggle Structured Log &Inspector\tF9").as_ptr(),
+        );
+        AppendMenuW(view_menu, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(
+            view_menu,
+            MF_STRING,
+            ID_VIEW_NEXT_BOUNDARY as usize,
+            to_wide("Jump to Next File &Boundary\tAlt+Down").as_ptr(),
+        );
+        AppendMenuW(
+            view_menu,
+            MF_STRING,
+            ID_VIEW_PREV_BOUNDARY as usize,
+            to_wide("Jump to Prev File Boundary\tAlt+Up").as_ptr(),
         );
         AppendMenuW(
             menu_bar,
@@ -127,13 +146,13 @@ pub fn create_main_menu() -> HMENU {
             to_wide("&View").as_ptr(),
         );
 
-        // 4. Search Menu
+        // 4. Search & Filter Menu
         let search_menu = CreatePopupMenu();
         AppendMenuW(
             search_menu,
             MF_STRING,
             ID_SEARCH_FIND as usize,
-            to_wide("&Find...\tCtrl+F").as_ptr(),
+            to_wide("&Find in Current Document...\tCtrl+F").as_ptr(),
         );
         AppendMenuW(
             search_menu,
@@ -147,12 +166,30 @@ pub fn create_main_menu() -> HMENU {
             ID_SEARCH_FIND_PREV as usize,
             to_wide("Find &Previous\tShift+F3").as_ptr(),
         );
-        AppendMenuW(search_menu, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(
             search_menu,
             MF_STRING,
             ID_SEARCH_CANCEL as usize,
-            to_wide("&Cancel Search\tEsc").as_ptr(),
+            to_wide("Cancel Current Search\tEsc").as_ptr(),
+        );
+        AppendMenuW(search_menu, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(
+            search_menu,
+            MF_STRING,
+            ID_FILTER_TOGGLE as usize,
+            to_wide("Toggle &Live Filter Panel\tCtrl+Shift+F").as_ptr(),
+        );
+        AppendMenuW(
+            search_menu,
+            MF_STRING,
+            ID_FILTER_CREATE_TAB as usize,
+            to_wide("Create &Filter-to-Tab...\tCtrl+Alt+F").as_ptr(),
+        );
+        AppendMenuW(
+            search_menu,
+            MF_STRING,
+            ID_FILTER_CLEAR as usize,
+            to_wide("Clear Filter Query").as_ptr(),
         );
         AppendMenuW(
             menu_bar,
@@ -161,28 +198,7 @@ pub fn create_main_menu() -> HMENU {
             to_wide("&Search").as_ptr(),
         );
 
-        // 5. Filter Menu
-        let filter_menu = CreatePopupMenu();
-        AppendMenuW(
-            filter_menu,
-            MF_STRING,
-            ID_FILTER_TOGGLE as usize,
-            to_wide("&Filter Results...\tCtrl+Shift+F").as_ptr(),
-        );
-        AppendMenuW(
-            filter_menu,
-            MF_STRING,
-            ID_FILTER_CLEAR as usize,
-            to_wide("&Clear Filter").as_ptr(),
-        );
-        AppendMenuW(
-            menu_bar,
-            MF_POPUP,
-            filter_menu as usize,
-            to_wide("F&ilter").as_ptr(),
-        );
-
-        // 6. Tools Menu
+        // 5. Tools Menu
         let tools_menu = CreatePopupMenu();
         AppendMenuW(
             tools_menu,
@@ -194,26 +210,45 @@ pub fn create_main_menu() -> HMENU {
             tools_menu,
             MF_STRING,
             ID_TOOLS_BOOKMARK_NEXT as usize,
-            to_wide("&Next Bookmark\tShift+F2").as_ptr(),
+            to_wide("Next Bookmark\tShift+F2").as_ptr(),
         );
         AppendMenuW(
             tools_menu,
             MF_STRING,
             ID_TOOLS_BOOKMARK_PREV as usize,
-            to_wide("&Previous Bookmark\tCtrl+F2").as_ptr(),
-        );
-        AppendMenuW(
-            tools_menu,
-            MF_STRING,
-            ID_TOOLS_JUMP_LINE as usize,
-            to_wide("&Jump to Line...\tCtrl+G").as_ptr(),
+            to_wide("Previous Bookmark\tAlt+F2").as_ptr(),
         );
         AppendMenuW(tools_menu, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(
             tools_menu,
             MF_STRING,
+            ID_TOOLS_HIGHLIGHT_RULES as usize,
+            to_wide("&Highlight Rules Editor...\tCtrl+H").as_ptr(),
+        );
+        AppendMenuW(
+            tools_menu,
+            MF_STRING,
+            ID_TOOLS_HIGHLIGHT_NEXT as usize,
+            to_wide("Jump to Next Highlight\tF8").as_ptr(),
+        );
+        AppendMenuW(
+            tools_menu,
+            MF_STRING,
+            ID_TOOLS_HIGHLIGHT_PREV as usize,
+            to_wide("Jump to Previous Highlight\tShift+F8").as_ptr(),
+        );
+        AppendMenuW(tools_menu, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(
+            tools_menu,
+            MF_STRING,
+            ID_TOOLS_JUMP_LINE as usize,
+            to_wide("&Jump to Line Number...\tCtrl+G").as_ptr(),
+        );
+        AppendMenuW(
+            tools_menu,
+            MF_STRING,
             ID_TOOLS_SETTINGS as usize,
-            to_wide("&Settings...\tF10").as_ptr(),
+            to_wide("Application &Settings...\tF10").as_ptr(),
         );
         AppendMenuW(
             menu_bar,
@@ -222,13 +257,13 @@ pub fn create_main_menu() -> HMENU {
             to_wide("&Tools").as_ptr(),
         );
 
-        // 7. Help Menu
+        // 6. Help Menu
         let help_menu = CreatePopupMenu();
         AppendMenuW(
             help_menu,
             MF_STRING,
             ID_HELP_ABOUT as usize,
-            to_wide("&About Tylogger\tF1").as_ptr(),
+            to_wide("&About Tylogger...\tF1").as_ptr(),
         );
         AppendMenuW(
             menu_bar,
@@ -241,7 +276,7 @@ pub fn create_main_menu() -> HMENU {
     }
 }
 
-/// Creates a context menu for a document tab.
+/// Creates the Tab context menu for right-click on tab items.
 pub fn create_tab_context_menu() -> HMENU {
     unsafe {
         let menu = CreatePopupMenu();
@@ -268,7 +303,7 @@ pub fn create_tab_context_menu() -> HMENU {
             menu,
             MF_STRING,
             ID_TAB_COPY_PATH as usize,
-            to_wide("Copy File &Path").as_ptr(),
+            to_wide("Copy &File Path").as_ptr(),
         );
         menu
     }

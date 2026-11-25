@@ -1,10 +1,13 @@
 use std::path::{Path, PathBuf};
 
+use crate::core::filter::{FilterCriteria, FilterEngine};
+use crate::core::highlight::HighlightGroup;
+use crate::core::multifile::MultiFileSource;
 use crate::core::reader::{NonLockingLogReader, UpdateEvent};
 
 /// A single open document tab in Tylogger.
 /// Maintains independent file handle, reader, bookmarks, scroll position,
-/// selection, follow tail state, and search/filter states.
+/// selection, follow tail state, columnizer, highlight rules, and search/filter states.
 pub struct Document {
     pub id: usize,
     pub path: Option<PathBuf>,
@@ -23,6 +26,12 @@ pub struct Document {
     pub current_match_idx: Option<usize>,
     pub filter_active: bool,
     pub filter_matches: Vec<usize>,
+    pub columnizer_id: String,
+    pub highlight_group: HighlightGroup,
+    pub is_multifile: bool,
+    pub is_filtered_tab: bool,
+    pub parent_doc_id: Option<usize>,
+    pub constituent_files: Vec<String>,
 }
 
 impl Document {
@@ -50,10 +59,24 @@ impl Document {
             current_match_idx: None,
             filter_active: false,
             filter_matches: Vec::new(),
+            columnizer_id: "plain".to_string(),
+            highlight_group: HighlightGroup::default_severity_group(),
+            is_multifile: false,
+            is_filtered_tab: false,
+            parent_doc_id: None,
+            constituent_files: Vec::new(),
         }
     }
 
     pub fn line_count(&self) -> usize {
+        if self.filter_active {
+            self.filter_matches.len()
+        } else {
+            self.reader.line_count()
+        }
+    }
+
+    pub fn raw_line_count(&self) -> usize {
         self.reader.line_count()
     }
 
@@ -62,15 +85,33 @@ impl Document {
     }
 
     pub fn get_line(&mut self, idx: usize) -> Result<String, String> {
-        self.reader.get_line(idx)
+        if self.filter_active {
+            let actual_idx = *self
+                .filter_matches
+                .get(idx)
+                .ok_or_else(|| format!("Filtered index {} out of bounds", idx))?;
+            self.reader.get_line(actual_idx)
+        } else {
+            self.reader.get_line(idx)
+        }
     }
 
     pub fn toggle_bookmark(&mut self, idx: usize) -> bool {
-        self.reader.toggle_bookmark(idx)
+        let actual_idx = if self.filter_active {
+            self.filter_matches.get(idx).copied().unwrap_or(idx)
+        } else {
+            idx
+        };
+        self.reader.toggle_bookmark(actual_idx)
     }
 
     pub fn is_bookmarked(&self, idx: usize) -> bool {
-        self.reader.is_bookmarked(idx)
+        let actual_idx = if self.filter_active {
+            self.filter_matches.get(idx).copied().unwrap_or(idx)
+        } else {
+            idx
+        };
+        self.reader.is_bookmarked(actual_idx)
     }
 
     pub fn bookmarks(&self) -> &[usize] {
@@ -128,6 +169,78 @@ impl Workspace {
         self.next_doc_id += 1;
 
         let doc = Document::new(doc_id, Some(path_ref.to_path_buf()), title, reader);
+        self.documents.push(doc);
+        self.active_idx = self.documents.len() - 1;
+        Ok(self.active_idx)
+    }
+
+    /// Opens a MultiFile rotated sequence.
+    pub fn open_multifile<P: AsRef<Path>>(&mut self, path: P) -> Result<usize, String> {
+        let path_ref = path.as_ref();
+        let rotated_paths = MultiFileSource::discover_rotated_files(path_ref);
+
+        let reader = NonLockingLogReader::open(path_ref)?;
+        let base_name = path_ref
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "MultiFile".to_string());
+
+        let title = format!("{} [MultiFile: {}]", base_name, rotated_paths.len());
+        let doc_id = self.next_doc_id;
+        self.next_doc_id += 1;
+
+        let mut doc = Document::new(doc_id, Some(path_ref.to_path_buf()), title, reader);
+        doc.is_multifile = true;
+        doc.constituent_files = rotated_paths
+            .into_iter()
+            .map(|p| {
+                p.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect();
+
+        self.documents.push(doc);
+        self.active_idx = self.documents.len() - 1;
+        Ok(self.active_idx)
+    }
+
+    /// Creates an independent virtual Filter-to-Tab from the active document.
+    pub fn create_filter_tab(&mut self, criteria: &FilterCriteria) -> Result<usize, String> {
+        let active_doc = self
+            .active_document_mut()
+            .ok_or_else(|| "No active document".to_string())?;
+
+        let parent_id = active_doc.id;
+        let parent_title = active_doc.title.clone();
+        let parent_path = active_doc.path.clone();
+        let total_lines = active_doc.reader.line_count();
+
+        let matches = FilterEngine::apply_filter(
+            total_lines,
+            |idx| active_doc.reader.get_line(idx).ok(),
+            criteria,
+            None,
+        );
+
+        let title = format!("{} [Filter: {}]", parent_title, criteria.pattern);
+        let doc_id = self.next_doc_id;
+        self.next_doc_id += 1;
+
+        // Clone reader handle pointing to the same file
+        let new_reader = if let Some(ref p) = parent_path {
+            NonLockingLogReader::open(p)?
+        } else {
+            NonLockingLogReader::from_mock_lines(&[])
+        };
+
+        let mut doc = Document::new(doc_id, parent_path, title, new_reader);
+        doc.is_filtered_tab = true;
+        doc.parent_doc_id = Some(parent_id);
+        doc.filter_active = true;
+        doc.filter_matches = matches;
+
         self.documents.push(doc);
         self.active_idx = self.documents.len() - 1;
         Ok(self.active_idx)
@@ -263,7 +376,7 @@ impl Workspace {
                     if idx != self.active_idx {
                         doc.has_new_activity = true;
                     } else if doc.follow_tail {
-                        let total = doc.reader.line_count();
+                        let total = doc.line_count();
                         if total > 0 {
                             doc.top_line = total.saturating_sub(25);
                             doc.selected_line = total - 1;
@@ -312,7 +425,7 @@ mod tests {
             let doc_a = ws.active_document().unwrap();
             assert_eq!(doc_a.top_line, 0);
             assert_eq!(doc_a.selected_line, 0);
-            assert!(!doc_a.is_bookmarked(1)); // Tab A has no bookmark at line 1!
+            assert!(!doc_a.is_bookmarked(1));
         }
 
         // Switch to Tab B and verify state is perfectly restored
