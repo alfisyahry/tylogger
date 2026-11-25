@@ -162,6 +162,29 @@ pub fn show_bookmark_manager_dialog(
     }
 }
 
+/// Displays Plugin Manager summary dialog.
+pub fn show_plugin_manager_dialog(hwnd: HWND, reg: &crate::core::plugin::PluginRegistry) {
+    let title: Vec<u16> = "Plugin Manager\0".encode_utf16().collect();
+    let message = format!(
+        "Tylogger Plugin Architecture & Extensibility:\n\n\
+        • Discovered Plugins: {}\n\
+        • Categories: Declarative Parsers (In-Process), Out-of-Process Hosts (Job Objects)\n\
+        • Security Model: Trust-gated execution, zero mandatory .NET / CLR runtime\n\
+        • Discovery Paths: %APPDATA%\\Tylogger\\plugins\\ and .\\plugins\\\0",
+        reg.count()
+    );
+    let msg_wide: Vec<u16> = message.encode_utf16().collect();
+
+    unsafe {
+        MessageBoxW(
+            hwnd,
+            msg_wide.as_ptr(),
+            title.as_ptr(),
+            MB_OK | MB_ICONINFORMATION,
+        );
+    }
+}
+
 /// Parses and validates a line number for Jump to Line navigation.
 pub fn parse_jump_target(input: &str, max_lines: usize) -> Option<usize> {
     if let Ok(num) = input.trim().parse::<usize>() {

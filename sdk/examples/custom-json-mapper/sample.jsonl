@@ -1,0 +1,2 @@
+{"timestamp":"2026-11-25T10:00:00Z","level":"INFO","service":"auth","trace_id":"trc-001","message":"Token generated"}
+{"timestamp":"2026-11-25T10:00:01Z","level":"ERROR","service":"payment","trace_id":"trc-002","message":"Gateway timeout"}

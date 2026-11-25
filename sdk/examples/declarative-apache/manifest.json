@@ -1,0 +1,11 @@
+{
+  "id": "com.tylogger.sdk.apache",
+  "name": "SDK Apache Combined Log Parser",
+  "version": "1.0.0",
+  "author": "Tylogger SDK Team",
+  "description": "Declarative parser for Apache Combined access logs",
+  "category": "columnizer",
+  "api_version": "1.0",
+  "min_app_version": "0.4.0",
+  "columnizer_config": "columnizer.json"
+}

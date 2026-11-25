@@ -1,0 +1,7 @@
+{
+  "id": "sdk_apache_combined",
+  "name": "Apache Combined Log Format",
+  "format": "regex",
+  "pattern": "^(?P<ClientIP>[^ ]+) (?P<Ident>[^ ]+) (?P<User>[^ ]+) \\[(?P<Timestamp>[^\\]]+)\\] \"(?P<Method>[^ ]+) (?P<Path>[^ ]+) (?P<Protocol>[^\"]+)\" (?P<Status>[^ ]+) (?P<Bytes>[^ ]+) \"(?P<Referer>[^\"]*)\" \"(?P<UserAgent>[^\"]*)\"",
+  "columns": ["ClientIP", "Ident", "User", "Timestamp", "Method", "Path", "Protocol", "Status", "Bytes", "Referer", "UserAgent"]
+}

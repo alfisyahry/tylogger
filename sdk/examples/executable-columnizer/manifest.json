@@ -1,0 +1,11 @@
+{
+  "id": "com.tylogger.sdk.standalone",
+  "name": "SDK Standalone IPC Columnizer",
+  "version": "1.0.0",
+  "author": "Tylogger SDK Team",
+  "description": "Out-of-process standalone executable parser communicating via length-prefixed JSON IPC",
+  "category": "columnizer",
+  "api_version": "1.0",
+  "min_app_version": "0.4.0",
+  "executable": "target/release/executable_columnizer.exe"
+}

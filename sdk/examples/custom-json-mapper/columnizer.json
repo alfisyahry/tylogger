@@ -1,0 +1,6 @@
+{
+  "id": "sdk_json_mapper",
+  "name": "Telemetry JSON Lines Mapper",
+  "format": "jsonl",
+  "columns": ["timestamp", "level", "service", "trace_id", "message"]
+}

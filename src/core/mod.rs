@@ -9,6 +9,7 @@ pub mod inspector;
 pub mod memory;
 pub mod multifile;
 pub mod multiline;
+pub mod plugin;
 pub mod reader;
 pub mod search;
 pub mod session;
@@ -28,6 +29,10 @@ pub use inspector::{InspectedRecord, InspectorField, LogInspector};
 pub use memory::{format_safe_preview_line, GlobalMemoryBudget};
 pub use multifile::MultiFileSource;
 pub use multiline::{LogicalRecord, MultilineEngine};
+pub use plugin::{
+    DeclarativeColumnizer, ExecutablePluginHost, PluginCategory, PluginIpcMessage, PluginManifest,
+    PluginRegistry, PluginTrustState,
+};
 pub use reader::{NonLockingLogReader, UpdateEvent};
 pub use search::{SearchEngine, SearchOptions, SearchResult};
 pub use session::{CrashRecoveryTracker, MissingSourceAction, SessionDocument, SessionState};

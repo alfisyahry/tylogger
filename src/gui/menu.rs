@@ -224,6 +224,12 @@ pub fn create_main_menu() -> HMENU {
             ID_TOOLS_BOOKMARK_MANAGER as usize,
             to_wide("&Bookmark Manager...\tCtrl+Shift+B").as_ptr(),
         );
+        AppendMenuW(
+            tools_menu,
+            MF_STRING,
+            ID_TOOLS_PLUGIN_MANAGER as usize,
+            to_wide("&Plugin Manager...\tCtrl+Shift+P").as_ptr(),
+        );
         AppendMenuW(tools_menu, MF_SEPARATOR, 0, std::ptr::null());
         AppendMenuW(
             tools_menu,
