@@ -1,0 +1,4 @@
+# Third-Party Dependencies
+
+- windows-sys (crate): MIT / Apache-2.0, Microsoft Corporation
+- Upstream reference architecture: LogExpert (MIT)
