@@ -76,7 +76,7 @@ impl Default for SessionState {
     fn default() -> Self {
         Self {
             schema_version: "3.0".to_string(),
-            app_version: "0.9.0".to_string(),
+            app_version: "1.0.0".to_string(),
             workspace_name: "Default Workspace".to_string(),
             active_tab_idx: 0,
             split_view_active: false,
@@ -138,7 +138,7 @@ impl SessionState {
     pub fn new_v3(name: &str) -> Self {
         Self {
             schema_version: "3.0".to_string(),
-            app_version: "0.9.0".to_string(),
+            app_version: "1.0.0".to_string(),
             workspace_name: name.to_string(),
             active_tab_idx: 0,
             split_view_active: false,

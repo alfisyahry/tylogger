@@ -7,7 +7,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 pub fn show_about_dialog(hwnd: HWND) {
     let title: Vec<u16> = "About Tylogger\0".encode_utf16().collect();
     let message = "Tylogger — High-Performance Native Windows Log Analysis Tool\n\
-        Version 0.8.0 (Phase 8 Complete Feature Parity, Functional Audit & Hardening)\n\
+        Version 1.0.0 GA (Milestone 1.0.0 General Availability)\n\
         Target: Windows 7 SP1 through Windows 11 (x86 & x64)\n\n\
         Architecture: Win32 native GDI / 64-bit sparse index engine\n\
         MultiFile Rotated Log Management | Modular Columnizers\n\

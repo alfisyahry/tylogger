@@ -63,7 +63,7 @@ fn main() {
 }
 
 fn print_usage() {
-    println!("Tylogger - Native Windows Log Analysis Tool (Win7 SP1 to Win11)");
+    println!("Tylogger v1.0.0 GA - Native Windows Log Analysis Tool (Win7 SP1 to Win11)");
     println!("Usage:");
     println!("  tylogger.exe [OPTIONS] [LOGFILE]");
     println!();
