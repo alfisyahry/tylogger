@@ -3,10 +3,10 @@
 
 Welcome to the Tylogger Plugin SDK. Tylogger supports two modular plugin mechanisms:
 
-1. **Declarative Columnizer Packages (100% In-Process, Zero Code, Safe):**
+1. **Declarative Columnizer Packages (In-Process Configuration):**
    - Configured via `manifest.json` and `columnizer.json`.
    - Supports delimited logs (CSV/TSV/custom delimiter), regular expression capture groups, and JSON Lines field mappings.
-   - Evaluated purely inside Tylogger with zero binary execution and zero security attack surface.
+   - Evaluated purely inside Tylogger with zero binary execution and no external executable launch; input validation is still necessary.
 
 2. **Trusted Executable Plugins (Out-of-Process, Windows Job Objects):**
    - Standalone binaries communicating over local Anonymous Pipes using length-prefixed JSON frames.

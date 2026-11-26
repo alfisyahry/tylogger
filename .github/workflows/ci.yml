@@ -1,0 +1,34 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [i686-pc-windows-msvc, x86_64-pc-windows-msvc]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --target ${{ matrix.target }}
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked --target ${{ matrix.target }} -- -D warnings
+      - name: Unit tests
+        run: cargo test --workspace --locked --target ${{ matrix.target }}
+      - name: Release build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Synthetic headless checks
+        run: ./target/${{ matrix.target }}/release/tylogger.exe --headless-test
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tylogger-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/tylogger.exe
+          if-no-files-found: error

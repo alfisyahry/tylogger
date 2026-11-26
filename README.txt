@@ -1,17 +1,12 @@
-Tylogger v1.0.0 GA - High-Performance Native Windows Log Analysis Tool
-======================================================================
-Architecture: Native Win32/GDI, Rust core, 64-bit sparse index engine.
-Supported OS: Windows 7 SP1 (with KB2533623), Windows 8/8.1, Windows 10, Windows 11 (x86 & x64).
+Tylogger 1.0.0 — public evaluation snapshot
+Developed and maintained by Lazy Coder.
+Native Windows log viewer and analysis project in Rust/Win32.
 
-Features:
-- Non-locking live log reader (FILE_SHARE_READ|WRITE|DELETE)
-- High-speed 64-bit sparse index for multi-gigabyte log files (>4GB)
-- Linear-time DFA search engine with ReDoS immunity
-- Modular columnizers (CLF, CSV, XML, JSON Lines, Syslog RFC 5424)
-- Virtual Filter-to-Tab with micro-batching
-- Time synchronization and multi-document sync loop guards
-- Windows DPAPI credential vault for secure remote access
+The internal GA label is not independent production sign-off. Read README.md
+and docs/PUBLIC_RELEASE_STATUS.md for outstanding GUI, compatibility, transport,
+installer and signing checks. Existing executable version fields remain 1.0.0.
 
-Portable Mode:
-When 'portable.flag' is present in this directory, Tylogger stores all settings,
-preferences, and bookmark files locally in './config/' without modifying the Windows registry.
+Keep portable.flag beside tylogger.exe for portable configuration.
+Open a synthetic or non-sensitive log with: tylogger.exe sample.log
+Do not use production credentials with unverified remote-source features.
+MIT license; see LICENSE and THIRD_PARTY_NOTICES.txt.

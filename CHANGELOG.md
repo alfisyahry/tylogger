@@ -1,3 +1,6 @@
+> Public release qualification: milestone names below are historical engineering labels.
+> This public snapshot remains an evaluation candidate; see docs/PUBLIC_RELEASE_STATUS.md.
+
 # Tylogger Changelog
 
 All notable changes to this project are documented in this file.
