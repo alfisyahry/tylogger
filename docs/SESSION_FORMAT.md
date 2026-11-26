@@ -90,3 +90,20 @@ When parsing `.lxp` and `.lxj` files:
 4. **External Tools (`<externalTool>` - RSK-11):**
    - Imported tool configurations are flagged as **Untrusted** (`is_trusted: false`) and **Disabled** by default.
    - Users must explicitly inspect and trust migrated external tool commands before execution to prevent malicious command execution from untrusted session files.
+
+---
+
+## 3. Windows Shell File Associations & Context Menu Integration
+
+In Phase 10 (Milestone 1.0.0 GA), native Windows shell integration is formalized:
+
+### 3.1 Native Extensions
+- **`.tysession`**: Dedicated session file format containing open tabs, columnizers, highlights, and follow-tail states.
+- **`.tyworkspace`**: Project workspace file format grouping multiple related logs and synchronized time settings.
+
+### 3.2 Non-Intrusive Context Menu Design
+To ensure developer-friendly behavior and zero system disruption:
+1. **No Default Handler Hijacking:** Tylogger does not usurp default associations for generic text files (`.txt`) or log files (`.log`). Users retain their chosen editor (Notepad, VS Code, etc.).
+2. **`SystemFileAssociations` Registration:** Uses modern Windows shell extension registration under `Software\Classes\SystemFileAssociations\.log\shell\OpenWithTylogger` and `SystemFileAssociations\.txt\shell\OpenWithTylogger`.
+3. **Optional Setup Task:** The context menu integration is presented as an optional checkbox during Inno Setup installation.
+
