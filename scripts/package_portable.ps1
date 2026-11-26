@@ -63,7 +63,7 @@ foreach ($arch in $archs) {
     }
 
     Write-Host "Compressing to $zipDest..."
-    Compress-Archive -Path "$appDir\*" -DestinationPath $zipDest -CompressionLevel Optimal
+    Compress-Archive -Path $appDir -DestinationPath $zipDest -CompressionLevel Optimal
 
     # Cleanup staging directory
     Remove-Item $stageDir -Recurse -Force
