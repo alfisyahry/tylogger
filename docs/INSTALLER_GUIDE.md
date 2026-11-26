@@ -61,3 +61,16 @@ To prevent file-in-use errors or binary corruption when upgrading an active inst
 - If Tylogger is running when the installer or uninstaller runs:
   - Interactive mode displays a friendly dialog prompting the user to save open sessions and close the application.
   - Silent mode waits or retries cleanly, avoiding ungraceful terminations.
+
+---
+
+## 4. Safe Uninstallation Guarantees (RSK-30)
+
+Uninstallation safety is governed by strict non-destructive policies:
+1. **Application Files Only:** The uninstaller only deletes files originally registered by the installation engine inside `{app}` (`tylogger.exe`, documentation, and sample templates).
+2. **User Data Preservation:**
+   - User configuration in `%APPDATA%\Tylogger\config.json` is **never deleted**.
+   - User session history, crash recovery snapshots, and workspace files are **never deleted**.
+   - Any log files being monitored, analyzed, or stored in `{app}\logs` or user directories remain **100% untouched**.
+3. **Clean Registry Deregistration:** Document associations (`.tysession`, `.tyworkspace`) and context menu handlers (`SystemFileAssociations`) are cleanly deregistered without leaving orphaned keys.
+
