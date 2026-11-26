@@ -152,6 +152,18 @@ pub fn verify_delay_load_runtime_safety() -> bool {
     }
 }
 
+/// Creates or opens the application single-instance mutex for installer detection (RSK-31, AG-40).
+pub fn create_app_mutex(name: &str) -> Option<HANDLE> {
+    use windows_sys::Win32::System::Threading::CreateMutexW;
+    let wide_name: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+    let handle = unsafe { CreateMutexW(null_mut(), 0, wide_name.as_ptr()) };
+    if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+        None
+    } else {
+        Some(handle)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,16 +206,3 @@ mod tests {
         }
     }
 }
-
-/// Creates or opens the application single-instance mutex for installer detection (RSK-31, AG-40).
-pub fn create_app_mutex(name: &str) -> Option<HANDLE> {
-    use windows_sys::Win32::System::Threading::CreateMutexW;
-    let wide_name: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
-    let handle = unsafe { CreateMutexW(null_mut(), 0, wide_name.as_ptr()) };
-    if handle.is_null() || handle == INVALID_HANDLE_VALUE {
-        None
-    } else {
-        Some(handle)
-    }
-}
-
