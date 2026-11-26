@@ -117,3 +117,28 @@ dumpbin /headers dist/legacy-x64/tylogger.exe
    - `/NXCOMPAT` (Data Execution Prevention enabled).
    - `/SAFESEH` (Structured Exception Handler table enforced on x86).
    - `/HIGHENTROPYVA` (64-bit ASLR address space randomization enabled on x64).
+
+---
+
+## 5. Universal Binary Architecture & Distribution Formalization
+
+During the Phase 9 release audit, cryptographic verification revealed that binaries in `dist/legacy-*` and `dist/modern-*` have identical SHA-256 hashes:
+- `legacy-x86/tylogger.exe` == `modern-x86/tylogger.exe` (PE32 i686)
+- `legacy-x64/tylogger.exe` == `modern-x64/tylogger.exe` (PE32+ x86_64)
+
+### 5.1 Technical Rationale
+The identical hash is the deliberate result of Tylogger's robust toolchain and runtime architecture:
+1. **Static CRT Linking (`+crt-static`):** Binaries statically embed the C runtime library, eliminating any dependency on version-specific `VCRUNTIME140.dll` or Windows UCRT DLLs.
+2. **Subsystem Version `6.01`:** Linking with `/SUBSYSTEM:WINDOWS,6.01` instructs the Windows PE loader that the executable can run natively on Windows 7 SP1 (Kernel NT 6.1) as well as any subsequent Windows version.
+3. **Dynamic Shims & Delayload (`WaitOnAddress`, `BCryptGenRandom`, `SetDefaultDllDirectories`):** High-level synchronization and cryptographic routines do not bind statically to Windows 8+ APIs. Instead, they delay-load or resolve entry points dynamically, with rock-solid Win32 Event and CryptoAPI fallbacks.
+
+### 5.2 Official Distribution Strategy
+In Phase 10 (Milestone 1.0.0 GA), distribution packages are formalized as genuine **Universal Binaries**:
+1. **Universal Portable ZIP Packages:**
+   - `dist/Tylogger-1.0.0-windows-x86-portable.zip` (Universal 32-bit for Windows 7 SP1 to Windows 11)
+   - `dist/Tylogger-1.0.0-windows-x64-portable.zip` (Universal 64-bit for Windows 7 SP1 to Windows 11)
+2. **Universal Native Windows Installers:**
+   - `dist/Tylogger-1.0.0-windows-x86-setup.exe` (Inno Setup 32-bit universal installer)
+   - `dist/Tylogger-1.0.0-windows-x64-setup.exe` (Inno Setup 64-bit universal installer)
+3. **Backwards Compatibility:** The internal `dist/legacy-*` and `dist/modern-*` directories are maintained in automated build scripts to avoid breaking existing testing pipelines.
+
