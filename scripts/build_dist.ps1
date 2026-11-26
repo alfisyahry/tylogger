@@ -1,6 +1,8 @@
-# Multi-target release build script for Tylogger
+# Multi-target release build script for Tylogger (Universal Binary Architecture)
 param(
-    [string]$DistDir = "dist"
+    [string]$DistDir = "dist",
+    [string]$Version = "1.0.0",
+    [string]$Milestone = "v1.0.0-ga"
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,10 +10,10 @@ $ErrorActionPreference = "Stop"
 $RootDir = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RootDir
 
-Write-Host "=== Building Tylogger Quad-Target Distribution ===" -ForegroundColor Cyan
+Write-Host "=== Building Tylogger Universal Quad-Target Distribution ===" -ForegroundColor Cyan
 
 # Ensure target directories exist
-$targets = @("legacy-x86", "legacy-x64", "modern-x86", "modern-x64")
+$targets = @("legacy-x86", "legacy-x64", "modern-x86", "modern-x64", "universal-x86", "universal-x64")
 foreach ($t in $targets) {
     $dir = Join-Path $DistDir $t
     if (-not (Test-Path $dir)) {
@@ -36,15 +38,19 @@ if ($LASTEXITCODE -ne 0) {
 $x64Bin = Join-Path $RootDir "target\x86_64-pc-windows-msvc\release\tylogger.exe"
 $x86Bin = Join-Path $RootDir "target\i686-pc-windows-msvc\release\tylogger.exe"
 
-# Copy binaries
+# Copy binaries to quad-target and universal distribution folders
 Copy-Item $x64Bin -Destination (Join-Path $DistDir "modern-x64\tylogger.exe") -Force
 Copy-Item $x64Bin -Destination (Join-Path $DistDir "legacy-x64\tylogger.exe") -Force
+Copy-Item $x64Bin -Destination (Join-Path $DistDir "universal-x64\tylogger.exe") -Force
+
 Copy-Item $x86Bin -Destination (Join-Path $DistDir "modern-x86\tylogger.exe") -Force
 Copy-Item $x86Bin -Destination (Join-Path $DistDir "legacy-x86\tylogger.exe") -Force
+Copy-Item $x86Bin -Destination (Join-Path $DistDir "universal-x86\tylogger.exe") -Force
 
-# Read git commit
+# Read git commit provenance
 $gitCommit = (git rev-parse HEAD).Trim()
 $timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+$compilerVer = (rustc --version).Trim()
 
 function Get-ArtifactMeta {
     param([string]$Path, [string]$Arch, [string]$PeType, [string]$Subsystem, [string]$Crt)
@@ -62,16 +68,19 @@ function Get-ArtifactMeta {
 
 $manifest = [PSCustomObject]@{
     product = "Tylogger"
-    version = "0.9.0"
-    milestone = "v0.9.0-rc1"
+    version = $Version
+    milestone = $Milestone
     commit = $gitCommit
     build_timestamp = $timestamp
-    compiler = "rustc 1.97.1"
+    compiler = $compilerVer
+    universal_binary_policy = "Unified static CRT + NT 6.01 subsystem + runtime delayload shims for Win7 SP1 through Win11"
     targets = [PSCustomObject]@{
         "legacy-x86" = Get-ArtifactMeta -Path (Join-Path $DistDir "legacy-x86\tylogger.exe") -Arch "i686" -PeType "PE32" -Subsystem "WINDOWS,6.01" -Crt "static"
         "legacy-x64" = Get-ArtifactMeta -Path (Join-Path $DistDir "legacy-x64\tylogger.exe") -Arch "x86_64" -PeType "PE32+" -Subsystem "WINDOWS,6.01" -Crt "static"
         "modern-x86" = Get-ArtifactMeta -Path (Join-Path $DistDir "modern-x86\tylogger.exe") -Arch "i686" -PeType "PE32" -Subsystem "WINDOWS,6.01" -Crt "static"
         "modern-x64" = Get-ArtifactMeta -Path (Join-Path $DistDir "modern-x64\tylogger.exe") -Arch "x86_64" -PeType "PE32+" -Subsystem "WINDOWS,6.01" -Crt "static"
+        "universal-x86" = Get-ArtifactMeta -Path (Join-Path $DistDir "universal-x86\tylogger.exe") -Arch "i686" -PeType "PE32" -Subsystem "WINDOWS,6.01" -Crt "static"
+        "universal-x64" = Get-ArtifactMeta -Path (Join-Path $DistDir "universal-x64\tylogger.exe") -Arch "x86_64" -PeType "PE32+" -Subsystem "WINDOWS,6.01" -Crt "static"
     }
 }
 
