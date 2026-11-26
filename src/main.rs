@@ -54,6 +54,8 @@ fn main() {
     }
 
     let state = AppState::new(workspace);
+    // Create AppMutex for installer running-instance detection (RSK-31, AG-40)
+    let _app_mutex = tylogger::core::compat::create_app_mutex("TyloggerSingleInstanceMutex");
     println!("[Tylogger] Launching Win32 Native GUI window...");
     if let Err(e) = run_gui_app(state) {
         eprintln!("[Fatal GUI Error] {}", e);

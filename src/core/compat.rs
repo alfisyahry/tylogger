@@ -184,4 +184,26 @@ mod tests {
         // Must execute cleanly without crashing on any Windows version
         let _ = enforce_safe_dll_search_order();
     }
+
+    #[test]
+    fn test_app_mutex_creation() {
+        let mutex_handle = create_app_mutex("TyloggerSingleInstanceMutex_Test");
+        assert!(mutex_handle.is_some());
+        if let Some(h) = mutex_handle {
+            unsafe { CloseHandle(h) };
+        }
+    }
 }
+
+/// Creates or opens the application single-instance mutex for installer detection (RSK-31, AG-40).
+pub fn create_app_mutex(name: &str) -> Option<HANDLE> {
+    use windows_sys::Win32::System::Threading::CreateMutexW;
+    let wide_name: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+    let handle = unsafe { CreateMutexW(null_mut(), 0, wide_name.as_ptr()) };
+    if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+        None
+    } else {
+        Some(handle)
+    }
+}
+
